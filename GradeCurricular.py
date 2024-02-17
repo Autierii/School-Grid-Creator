@@ -1,43 +1,32 @@
-import json
+# Primeiro passo
+num_aulas = int(input("Quantas aulas por dia serão? "))
+horarios = [input(f"Horário da aula {i+1}: ") for i in range(num_aulas)]
 
-class Professor:
-    def __init__(self, apelido):
-        self.apelido = apelido
-        self.horarios = {}
+# Segundo passo
+num_materias = int(input("Quantas matérias serão dadas ao longo da semana? "))
+materias_orig = {input(f"Sigla da matéria {i+1}: "): input("Nome do professor: ") for i in range(num_materias)}
+materias = materias_orig.copy()
 
-    def adicionar_aula(self, dia, horario, materia):
-        if dia in self.horarios:
-            if horario in self.horarios[dia]:
-                return False
-        else:
-            self.horarios[dia] = {}
-        self.horarios[dia][horario] = materia
-        return True
+# Terceiro passo
+num_turmas = int(input("Número de turmas: "))
+turmas = [f"Turma {i+1}" for i in range(num_turmas)]
 
-def criar_horario(professores):
-    horario = {"segunda": {}, "terça": {}, "quarta": {}, "quinta": {}, "sexta": {}}
-    aulas_por_dia = int(input("Quantas aulas por dia serão? "))
-    for dia in horario:
-        for i in range(aulas_por_dia):
-            horario_aula = input(f"Qual o horário da aula {i+1} no dia {dia}? ")
-            materia = input("Qual a matéria que será dada (em sigla)? ")
-            apelido_professor = input("Qual o apelido do professor que dará essa matéria? ")
-            if apelido_professor not in professores:
-                professores[apelido_professor] = Professor(apelido_professor)
-            if not professores[apelido_professor].adicionar_aula(dia, horario_aula, materia):
-                print(f"Conflito de horário para o professor {apelido_professor} no dia {dia} às {horario_aula}")
-            else:
-                horario[dia][horario_aula] = {"materia": materia, "professor": apelido_professor}
-    return horario
+# Criando a grade de horário
+dias_semana = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']
+grade = {dia: {horario: "" for horario in horarios} for dia in dias_semana}
 
-def salvar_horario(horario):
-    with open('horario.json', 'w') as f:
-        json.dump(horario, f)
+# Preenchendo a grade com as matérias e professores
+for dia in dias_semana:
+    for horario in horarios:
+        if not materias:  # se o dicionário estiver vazio, recarregue as matérias
+            materias = materias_orig.copy()
+        materia, professor = materias.popitem()
+        grade[dia][horario] = f"{materia} ({professor})"
 
-def main():
-    professores = {}
-    horario = criar_horario(professores)
-    salvar_horario(horario)
-
-if __name__ == "__main__":
-    main()
+# Exibindo a grade de horário para cada turma
+for turma in turmas:
+    print(f"\nGrade de Horário da {turma}:")
+    for dia in dias_semana:
+        print(f"\n{dia}:")
+        for horario in horarios:
+            print(f"{horario}: {grade[dia][horario]}")
