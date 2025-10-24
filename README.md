@@ -25,7 +25,7 @@ Ele foi criado para facilitar a **distribuição de aulas** semanais em escolas 
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/usuario/grade-curricular.git
+git clone https://github.com/Autierii/grade-curricular.git
 cd grade-curricular
 
 # Executar
@@ -92,5 +92,3 @@ README.md             # Documentação
 ## 📝 Licença
 
 Este projeto está licenciado sob a licença MIT — sinta-se livre para usar e modificar.
-
-> 💡 *"Educar é distribuir o tempo com sabedoria."*
