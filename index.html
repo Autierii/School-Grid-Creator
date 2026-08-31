@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Grade Curricular</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- FontAwesome (Optional, for icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+
+        function App() {
+            const [step, setStep] = useState(1);
+            
+            // Step 1: Configuração de Horários
+            const [numAulasDia, setNumAulasDia] = useState(3);
+            const [horarios, setHorarios] = useState(["8h", "10h", "14h"]);
+
+            // Step 2: Matérias, Professores e Turmas
+            const [materias, setMaterias] = useState([]);
+            
+            // Resultado
+            const [grade, setGrade] = useState(null);
+            const [turmasDisponiveis, setTurmasDisponiveis] = useState([]);
+
+            // Handlers para Step 1
+            const updateHorario = (index, value) => {
+                const newHorarios = [...horarios];
+                newHorarios[index] = value;
+                setHorarios(newHorarios);
+            };
+
+            const changeNumAulas = (val) => {
+                const n = parseInt(val) || 1;
+                setNumAulasDia(n);
+                if (n > horarios.length) {
+                    setHorarios([...horarios, ...Array(n - horarios.length).fill("")]);
+                } else if (n < horarios.length) {
+                    setHorarios(horarios.slice(0, n));
+                }
+            };
+
+            // Handlers para Step 2 (Simplified state management)
+            const addMateria = () => {
+                setMaterias([...materias, { id: Date.now(), sigla: "", professores: [] }]);
+            };
+
+            const updateMateria = (index, sigla) => {
+                const newMaterias = [...materias];
+                newMaterias[index].sigla = sigla.toUpperCase();
+                setMaterias(newMaterias);
+            };
+
+            const removeMateria = (index) => {
+                setMaterias(materias.filter((_, i) => i !== index));
+            };
+
+            const addProfessor = (materiaIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores.push({
+                    id: Date.now(),
+                    nome: "",
+                    turmas: [],
+                    indisponibilidades: []
+                });
+                setMaterias(newMaterias);
+            };
+
+            const updateProfessor = (materiaIndex, profIndex, nome) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].nome = nome;
+                setMaterias(newMaterias);
+            };
+            
+            const removeProfessor = (materiaIndex, profIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores = newMaterias[materiaIndex].professores.filter((_, i) => i !== profIndex);
+                setMaterias(newMaterias);
+            };
+
+            const addTurmaAoProfessor = (materiaIndex, profIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].turmas.push({ id: Date.now(), nome: "", aulas: 1 });
+                setMaterias(newMaterias);
+            };
+
+            const updateTurma = (materiaIndex, profIndex, turmaIndex, field, value) => {
+                const newMaterias = [...materias];
+                if (field === 'nome') value = value.toUpperCase();
+                newMaterias[materiaIndex].professores[profIndex].turmas[turmaIndex][field] = value;
+                setMaterias(newMaterias);
+            };
+
+            const removeTurma = (materiaIndex, profIndex, turmaIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].turmas = newMaterias[materiaIndex].professores[profIndex].turmas.filter((_, i) => i !== turmaIndex);
+                setMaterias(newMaterias);
+            };
+
+            const addIndisponibilidade = (materiaIndex, profIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].indisponibilidades.push({ id: Date.now(), dia: "Segunda", hora: horarios[0] || "" });
+                setMaterias(newMaterias);
+            };
+
+            const updateIndisponibilidade = (materiaIndex, profIndex, indispIndex, field, value) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].indisponibilidades[indispIndex][field] = value;
+                setMaterias(newMaterias);
+            };
+
+            const removeIndisponibilidade = (materiaIndex, profIndex, indispIndex) => {
+                const newMaterias = [...materias];
+                newMaterias[materiaIndex].professores[profIndex].indisponibilidades = newMaterias[materiaIndex].professores[profIndex].indisponibilidades.filter((_, i) => i !== indispIndex);
+                setMaterias(newMaterias);
+            };
+
+            // Algoritmo de Geração
+            const gerarGrade = () => {
+                const turmasSet = new Set();
+                
+                // Mapear dados para o formato do algoritmo
+                let aulasRestantes = []; // array de { mat, prof, turma, count }
+                let indispMap = {}; // prof -> set of "dia-hora"
+
+                materias.forEach(mat => {
+                    mat.professores.forEach(prof => {
+                        indispMap[prof.nome] = new Set(prof.indisponibilidades.map(ind => `${ind.dia}-${ind.hora}`));
+                        
+                        prof.turmas.forEach(turma => {
+                            turmasSet.add(turma.nome);
+                            aulasRestantes.push({
+                                mat: mat.sigla,
+                                prof: prof.nome,
+                                turma: turma.nome,
+                                count: parseInt(turma.aulas)
+                            });
+                        });
+                    });
+                });
+
+                const turmasList = Array.from(turmasSet);
+                setTurmasDisponiveis(turmasList);
+
+                // Initialize empty grade
+                let newGrade = {};
+                turmasList.forEach(t => {
+                    newGrade[t] = {};
+                    DIAS.forEach(d => {
+                        newGrade[t][d] = {};
+                        horarios.forEach(h => {
+                            newGrade[t][d][h] = "—";
+                        });
+                    });
+                });
+
+                // Greedily fill the schedule
+                DIAS.forEach(dia => {
+                    horarios.forEach(hora => {
+                        let professoresUsados = new Set();
+                        
+                        turmasList.forEach(turma => {
+                            let melhorOpcao = null;
+                            let melhorIndex = -1;
+
+                            for (let i = 0; i < aulasRestantes.length; i++) {
+                                const item = aulasRestantes[i];
+                                if (item.turma !== turma || item.count <= 0) continue;
+                                if (professoresUsados.has(item.prof)) continue;
+                                if (indispMap[item.prof].has(`${dia}-${hora}`)) continue;
+
+                                melhorOpcao = item;
+                                melhorIndex = i;
+                                break; // Found a valid teacher for this class at this time
+                            }
+
+                            if (melhorOpcao) {
+                                newGrade[turma][dia][hora] = `${melhorOpcao.mat} (${melhorOpcao.prof})`;
+                                aulasRestantes[melhorIndex].count -= 1;
+                                professoresUsados.add(melhorOpcao.prof);
+                            }
+                        });
+                    });
+                });
+
+                setGrade(newGrade);
+                setStep(3);
+            };
+
+            return (
+                <div className="min-h-screen p-8 text-gray-800">
+                    <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+                        
+                        {/* Header */}
+                        <div className="bg-blue-600 p-6 text-white text-center">
+                            <h1 className="text-3xl font-bold"><i className="fa-solid fa-calendar-days mr-2"></i> Gerador de Grade Curricular</h1>
+                            <p className="mt-2 opacity-80">Organize os horários de turmas e professores facilmente</p>
+                        </div>
+
+                        {/* Steps Indicator */}
+                        <div className="flex border-b">
+                            <div className={`flex-1 text-center py-4 font-semibold ${step === 1 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>1. Horários</div>
+                            <div className={`flex-1 text-center py-4 font-semibold ${step === 2 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>2. Professores e Turmas</div>
+                            <div className={`flex-1 text-center py-4 font-semibold ${step === 3 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>3. Grade Gerada</div>
+                        </div>
+
+                        <div className="p-8">
+                            
+                            {/* STEP 1 */}
+                            {step === 1 && (
+                                <div className="fade-in space-y-6">
+                                    <h2 className="text-2xl font-bold text-gray-700">Configuração de Horários</h2>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-600 mb-2">Quantas aulas por dia?</label>
+                                        <input type="number" min="1" value={numAulasDia} onChange={(e) => changeNumAulas(e.target.value)} className="w-32 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200 focus:outline-none" />
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {horarios.map((h, i) => (
+                                            <div key={i}>
+                                                <label className="block text-xs text-gray-500 mb-1">Horário {i + 1}</label>
+                                                <input type="text" value={h} onChange={(e) => updateHorario(i, e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200 focus:outline-none" placeholder="Ex: 8h00" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-8 flex justify-end">
+                                        <button onClick={() => setStep(2)} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Próximo Passo <i className="fa-solid fa-arrow-right ml-2"></i></button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 2 */}
+                            {step === 2 && (
+                                <div className="fade-in space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-gray-700">Matérias e Professores</h2>
+                                        <button onClick={addMateria} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition"><i className="fa-solid fa-plus mr-2"></i> Adicionar Matéria</button>
+                                    </div>
+
+                                    {materias.length === 0 && (
+                                        <div className="text-center py-10 text-gray-400">Nenhuma matéria adicionada. Clique no botão acima para começar.</div>
+                                    )}
+
+                                    {materias.map((mat, matIdx) => (
+                                        <div key={mat.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative">
+                                            <button onClick={() => removeMateria(matIdx)} className="absolute top-4 right-4 text-red-500 hover:text-red-700"><i className="fa-solid fa-trash"></i></button>
+                                            
+                                            <div className="flex items-center space-x-4 mb-4">
+                                                <label className="font-semibold">Sigla da Matéria:</label>
+                                                <input type="text" value={mat.sigla} onChange={(e) => updateMateria(matIdx, e.target.value)} className="px-3 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Ex: MAT" />
+                                            </div>
+
+                                            <div className="pl-4 border-l-2 border-blue-200 space-y-4">
+                                                {mat.professores.map((prof, profIdx) => (
+                                                    <div key={prof.id} className="bg-white border rounded p-4 relative shadow-sm">
+                                                        <button onClick={() => removeProfessor(matIdx, profIdx)} className="absolute top-4 right-4 text-red-500 hover:text-red-700"><i className="fa-solid fa-times"></i></button>
+                                                        
+                                                        <div className="flex items-center space-x-4 mb-3">
+                                                            <label className="font-semibold text-sm">Professor:</label>
+                                                            <input type="text" value={prof.nome} onChange={(e) => updateProfessor(matIdx, profIdx, e.target.value)} className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Nome do Professor" />
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                            {/* Turmas do Professor */}
+                                                            <div>
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <span className="text-sm font-semibold text-gray-600">Turmas:</span>
+                                                                    <button onClick={() => addTurmaAoProfessor(matIdx, profIdx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">+ Turma</button>
+                                                                </div>
+                                                                {prof.turmas.map((turma, turmaIdx) => (
+                                                                    <div key={turma.id} className="flex space-x-2 mb-2 items-center">
+                                                                        <input type="text" placeholder="Turma (Ex: 1A)" value={turma.nome} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'nome', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm" />
+                                                                        <input type="number" min="1" placeholder="Aulas" value={turma.aulas} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'aulas', e.target.value)} className="w-1/3 px-2 py-1 border rounded text-sm" />
+                                                                        <button onClick={() => removeTurma(matIdx, profIdx, turmaIdx)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-minus-circle"></i></button>
+                                                                    </div>
+                                                                ))}
+                                                                {prof.turmas.length === 0 && <p className="text-xs text-gray-400">Nenhuma turma adicionada.</p>}
+                                                            </div>
+
+                                                            {/* Indisponibilidades */}
+                                                            <div>
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <span className="text-sm font-semibold text-gray-600">Indisponibilidades:</span>
+                                                                    <button onClick={() => addIndisponibilidade(matIdx, profIdx)} className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200">+ Indisponibilidade</button>
+                                                                </div>
+                                                                {prof.indisponibilidades.map((ind, indIdx) => (
+                                                                    <div key={ind.id} className="flex space-x-2 mb-2 items-center">
+                                                                        <select value={ind.dia} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'dia', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm">
+                                                                            {DIAS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                                        </select>
+                                                                        <select value={ind.hora} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'hora', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm">
+                                                                            {horarios.map(h => <option key={h} value={h}>{h || '-'}</option>)}
+                                                                        </select>
+                                                                        <button onClick={() => removeIndisponibilidade(matIdx, profIdx, indIdx)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-minus-circle"></i></button>
+                                                                    </div>
+                                                                ))}
+                                                                {prof.indisponibilidades.length === 0 && <p className="text-xs text-gray-400">Nenhuma restrição.</p>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                
+                                                <button onClick={() => addProfessor(matIdx)} className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"><i className="fa-solid fa-user-plus mr-1"></i> Adicionar Professor para {mat.sigla || "esta matéria"}</button>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div className="mt-8 flex justify-between">
+                                        <button onClick={() => setStep(1)} className="text-gray-500 px-6 py-2 rounded-lg hover:bg-gray-100 transition">Voltar</button>
+                                        <button onClick={gerarGrade} className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"><i className="fa-solid fa-wand-magic-sparkles mr-2"></i> Gerar Grade</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 3 */}
+                            {step === 3 && grade && (
+                                <div className="fade-in space-y-8">
+                                    <h2 className="text-2xl font-bold text-gray-700">Grades Geradas</h2>
+                                    
+                                    {turmasDisponiveis.map(turma => (
+                                        <div key={turma} className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                                            <div className="bg-gray-800 text-white px-4 py-3 font-bold text-lg">
+                                                Turma: {turma}
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-gray-100 text-gray-600 font-medium border-b">
+                                                        <tr>
+                                                            <th className="px-4 py-3">Horário</th>
+                                                            {DIAS.map(d => <th key={d} className="px-4 py-3">{d}</th>)}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {horarios.map(hora => (
+                                                            <tr key={hora} className="border-b last:border-0 hover:bg-gray-50">
+                                                                <td className="px-4 py-3 font-semibold text-gray-700 bg-gray-50">{hora}</td>
+                                                                {DIAS.map(dia => {
+                                                                    const aula = grade[turma][dia][hora];
+                                                                    const isVago = aula === "—";
+                                                                    return (
+                                                                        <td key={dia} className={`px-4 py-3 ${isVago ? 'text-gray-400 italic' : 'text-gray-800 font-medium'}`}>
+                                                                            {aula}
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {turmasDisponiveis.length === 0 && (
+                                        <div className="text-center py-10 text-gray-500">Nenhuma turma encontrada para gerar a grade.</div>
+                                    )}
+
+                                    <div className="mt-8 flex justify-center">
+                                        <button onClick={() => setStep(2)} className="text-gray-500 px-6 py-2 rounded-lg hover:bg-gray-100 transition mr-4">Editar Dados</button>
+                                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"><i className="fa-solid fa-print mr-2"></i> Imprimir Grade</button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
