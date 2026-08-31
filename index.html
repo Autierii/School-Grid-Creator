@@ -4,45 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerador de Grade Curricular</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- FontAwesome (Optional, for icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Inter', sans-serif; background-color: #0f0a14; color: #e2e8f0; }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Scrollbar styles for dark theme */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1025; }
+        ::-webkit-scrollbar-thumb { background: #581c87; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #7e22ce; }
+        
+        /* Print Styles */
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .print-bg-dark { background-color: #f3f4f6 !important; color: black !important; border: 1px solid #ddd; }
+            .print-text-dark { color: black !important; }
+            .print-border { border: 1px solid #ccc !important; }
+            * { text-shadow: none !important; box-shadow: none !important; }
+        }
     </style>
 </head>
-<body>
+<body class="bg-[#0b0510] min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
-
+        const { useState } = React;
         const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 
         function App() {
             const [step, setStep] = useState(1);
             
-            // Step 1: Configuração de Horários
             const [numAulasDia, setNumAulasDia] = useState(3);
             const [horarios, setHorarios] = useState(["8h", "10h", "14h"]);
-
-            // Step 2: Matérias, Professores e Turmas
             const [materias, setMaterias] = useState([]);
             
-            // Resultado
             const [grade, setGrade] = useState(null);
             const [turmasDisponiveis, setTurmasDisponiveis] = useState([]);
+            const [erroGeracao, setErroGeracao] = useState("");
+            const [isGenerating, setIsGenerating] = useState(false);
 
-            // Handlers para Step 1
             const updateHorario = (index, value) => {
                 const newHorarios = [...horarios];
                 newHorarios[index] = value;
@@ -59,38 +65,24 @@
                 }
             };
 
-            // Handlers para Step 2 (Simplified state management)
-            const addMateria = () => {
-                setMaterias([...materias, { id: Date.now(), sigla: "", professores: [] }]);
-            };
-
+            const addMateria = () => setMaterias([...materias, { id: Date.now(), sigla: "", professores: [] }]);
             const updateMateria = (index, sigla) => {
                 const newMaterias = [...materias];
                 newMaterias[index].sigla = sigla.toUpperCase();
                 setMaterias(newMaterias);
             };
-
-            const removeMateria = (index) => {
-                setMaterias(materias.filter((_, i) => i !== index));
-            };
+            const removeMateria = (index) => setMaterias(materias.filter((_, i) => i !== index));
 
             const addProfessor = (materiaIndex) => {
                 const newMaterias = [...materias];
-                newMaterias[materiaIndex].professores.push({
-                    id: Date.now(),
-                    nome: "",
-                    turmas: [],
-                    indisponibilidades: []
-                });
+                newMaterias[materiaIndex].professores.push({ id: Date.now(), nome: "", turmas: [], indisponibilidades: [] });
                 setMaterias(newMaterias);
             };
-
             const updateProfessor = (materiaIndex, profIndex, nome) => {
                 const newMaterias = [...materias];
                 newMaterias[materiaIndex].professores[profIndex].nome = nome;
                 setMaterias(newMaterias);
             };
-            
             const removeProfessor = (materiaIndex, profIndex) => {
                 const newMaterias = [...materias];
                 newMaterias[materiaIndex].professores = newMaterias[materiaIndex].professores.filter((_, i) => i !== profIndex);
@@ -102,14 +94,12 @@
                 newMaterias[materiaIndex].professores[profIndex].turmas.push({ id: Date.now(), nome: "", aulas: 1 });
                 setMaterias(newMaterias);
             };
-
             const updateTurma = (materiaIndex, profIndex, turmaIndex, field, value) => {
                 const newMaterias = [...materias];
                 if (field === 'nome') value = value.toUpperCase();
                 newMaterias[materiaIndex].professores[profIndex].turmas[turmaIndex][field] = value;
                 setMaterias(newMaterias);
             };
-
             const removeTurma = (materiaIndex, profIndex, turmaIndex) => {
                 const newMaterias = [...materias];
                 newMaterias[materiaIndex].professores[profIndex].turmas = newMaterias[materiaIndex].professores[profIndex].turmas.filter((_, i) => i !== turmaIndex);
@@ -121,39 +111,56 @@
                 newMaterias[materiaIndex].professores[profIndex].indisponibilidades.push({ id: Date.now(), dia: "Segunda", hora: horarios[0] || "" });
                 setMaterias(newMaterias);
             };
-
             const updateIndisponibilidade = (materiaIndex, profIndex, indispIndex, field, value) => {
                 const newMaterias = [...materias];
                 newMaterias[materiaIndex].professores[profIndex].indisponibilidades[indispIndex][field] = value;
                 setMaterias(newMaterias);
             };
-
             const removeIndisponibilidade = (materiaIndex, profIndex, indispIndex) => {
                 const newMaterias = [...materias];
                 newMaterias[materiaIndex].professores[profIndex].indisponibilidades = newMaterias[materiaIndex].professores[profIndex].indisponibilidades.filter((_, i) => i !== indispIndex);
                 setMaterias(newMaterias);
             };
 
-            // Algoritmo de Geração
             const gerarGrade = () => {
-                const turmasSet = new Set();
+                setIsGenerating(true);
+                setErroGeracao("");
                 
-                // Mapear dados para o formato do algoritmo
-                let aulasRestantes = []; // array de { mat, prof, turma, count }
-                let indispMap = {}; // prof -> set of "dia-hora"
+                setTimeout(() => {
+                    const success = resolverGrade();
+                    setIsGenerating(false);
+                    if (success) {
+                        setStep(3);
+                    }
+                }, 50);
+            };
+
+            const resolverGrade = () => {
+                const turmasSet = new Set();
+                let requirements = [];
+                let indispMap = {};
+                let requiredHoursCount = 0;
 
                 materias.forEach(mat => {
                     mat.professores.forEach(prof => {
-                        indispMap[prof.nome] = new Set(prof.indisponibilidades.map(ind => `${ind.dia}-${ind.hora}`));
+                        if (!indispMap[prof.nome]) {
+                            indispMap[prof.nome] = new Set();
+                        }
+                        prof.indisponibilidades.forEach(ind => {
+                            if(ind.dia && ind.hora) indispMap[prof.nome].add(`${ind.dia}-${ind.hora}`);
+                        });
                         
                         prof.turmas.forEach(turma => {
+                            if (!turma.nome || parseInt(turma.aulas) <= 0) return;
                             turmasSet.add(turma.nome);
-                            aulasRestantes.push({
+                            requirements.push({
                                 mat: mat.sigla,
                                 prof: prof.nome,
                                 turma: turma.nome,
-                                count: parseInt(turma.aulas)
+                                total: parseInt(turma.aulas),
+                                remaining: parseInt(turma.aulas)
                             });
+                            requiredHoursCount += parseInt(turma.aulas);
                         });
                     });
                 });
@@ -161,88 +168,172 @@
                 const turmasList = Array.from(turmasSet);
                 setTurmasDisponiveis(turmasList);
 
-                // Initialize empty grade
+                const maxCapacity = turmasList.length * DIAS.length * horarios.length;
+                if (requiredHoursCount > maxCapacity) {
+                    setErroGeracao(`Impossível resolver. Você exigiu ${requiredHoursCount} aulas, mas a escola só tem capacidade para ${maxCapacity} aulas (por turma).`);
+                    return false;
+                }
+                
+                for (let t of turmasList) {
+                    const reqsTurma = requirements.filter(r => r.turma === t).reduce((sum, r) => sum + r.total, 0);
+                    if (reqsTurma > DIAS.length * horarios.length) {
+                        setErroGeracao(`A turma ${t} precisa de ${reqsTurma} aulas, mas só existem ${DIAS.length * horarios.length} horários semanais disponíveis.`);
+                        return false;
+                    }
+                }
+
+                const slots = [];
+                turmasList.forEach(turma => {
+                    DIAS.forEach(dia => {
+                        horarios.forEach(hora => slots.push({ turma, dia, hora }));
+                    });
+                });
+
+                let timetable = {};
+                turmasList.forEach(t => {
+                    timetable[t] = {};
+                    DIAS.forEach(d => {
+                        timetable[t][d] = {};
+                        horarios.forEach(h => timetable[t][d][h] = -1);
+                    });
+                });
+
+                let solved = false;
+                let iterations = 0;
+                const MAX_ITERATIONS = 50000;
+
+                const isSafe = (req, t, d, h) => {
+                    if (req.turma !== t) return false;
+                    if (req.remaining <= 0) return false;
+                    if (indispMap[req.prof].has(`${d}-${h}`)) return false;
+
+                    for (let otherT of turmasList) {
+                        if (otherT !== t) {
+                            const otherReqIdx = timetable[otherT][d][h];
+                            if (otherReqIdx !== -1) {
+                                const otherReq = requirements[otherReqIdx];
+                                if (otherReq.prof === req.prof) return false;
+                            }
+                        }
+                    }
+
+                    let sameSubjectCount = 0;
+                    for (let otherH of horarios) {
+                        const assignedReqIdx = timetable[t][d][otherH];
+                        if (assignedReqIdx !== -1 && requirements[assignedReqIdx].mat === req.mat) {
+                            sameSubjectCount++;
+                        }
+                    }
+                    if (sameSubjectCount >= 2) return false;
+
+                    return true;
+                };
+
+                const solve = (reqIdxToAssignList) => {
+                    iterations++;
+                    if (iterations > MAX_ITERATIONS) return false;
+
+                    let pendingReqs = reqIdxToAssignList.filter(i => requirements[i].remaining > 0);
+                    if (pendingReqs.length === 0) return true;
+
+                    pendingReqs.sort((a,b) => requirements[b].remaining - requirements[a].remaining);
+                    const reqIdx = pendingReqs[0];
+                    const req = requirements[reqIdx];
+
+                    let validSlots = [];
+                    for (let d of DIAS) {
+                        for (let h of horarios) {
+                            if (timetable[req.turma][d][h] === -1 && isSafe(req, req.turma, d, h)) {
+                                validSlots.push({d, h});
+                            }
+                        }
+                    }
+
+                    if (validSlots.length === 0) return false;
+
+                    for (let slot of validSlots) {
+                        timetable[req.turma][slot.d][slot.h] = reqIdx;
+                        req.remaining -= 1;
+
+                        if (solve(pendingReqs)) return true;
+
+                        timetable[req.turma][slot.d][slot.h] = -1;
+                        req.remaining += 1;
+                    }
+
+                    return false;
+                };
+
+                let reqIdxsInit = Array.from({length: requirements.length}, (_, i) => i);
+                solved = solve(reqIdxsInit);
+
+                if (!solved) {
+                    if (iterations > MAX_ITERATIONS) {
+                        setErroGeracao("O algoritmo atingiu o limite de tentativas. A grade pode ser muito complexa ou não ter solução viável sob as restrições impostas.");
+                    } else {
+                        setErroGeracao("Não foi possível encontrar uma combinação válida para gerar a grade! Verifique se há restrições demais ou choques de horário intransponíveis.");
+                    }
+                    return false;
+                }
+
                 let newGrade = {};
                 turmasList.forEach(t => {
                     newGrade[t] = {};
                     DIAS.forEach(d => {
                         newGrade[t][d] = {};
                         horarios.forEach(h => {
-                            newGrade[t][d][h] = "—";
-                        });
-                    });
-                });
-
-                // Greedily fill the schedule
-                DIAS.forEach(dia => {
-                    horarios.forEach(hora => {
-                        let professoresUsados = new Set();
-                        
-                        turmasList.forEach(turma => {
-                            let melhorOpcao = null;
-                            let melhorIndex = -1;
-
-                            for (let i = 0; i < aulasRestantes.length; i++) {
-                                const item = aulasRestantes[i];
-                                if (item.turma !== turma || item.count <= 0) continue;
-                                if (professoresUsados.has(item.prof)) continue;
-                                if (indispMap[item.prof].has(`${dia}-${hora}`)) continue;
-
-                                melhorOpcao = item;
-                                melhorIndex = i;
-                                break; // Found a valid teacher for this class at this time
-                            }
-
-                            if (melhorOpcao) {
-                                newGrade[turma][dia][hora] = `${melhorOpcao.mat} (${melhorOpcao.prof})`;
-                                aulasRestantes[melhorIndex].count -= 1;
-                                professoresUsados.add(melhorOpcao.prof);
+                            const reqIdx = timetable[t][d][h];
+                            if (reqIdx !== -1) {
+                                const req = requirements[reqIdx];
+                                newGrade[t][d][h] = `${req.mat} (${req.prof})`;
+                            } else {
+                                newGrade[t][d][h] = "—";
                             }
                         });
                     });
                 });
 
                 setGrade(newGrade);
-                setStep(3);
+                return true;
             };
 
             return (
-                <div className="min-h-screen p-8 text-gray-800">
-                    <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="min-h-screen p-8 text-gray-200">
+                    <div className="max-w-6xl mx-auto bg-[#130b1c] rounded-2xl shadow-[0_0_40px_rgba(107,33,168,0.2)] border border-purple-900/50 overflow-hidden no-print">
                         
-                        {/* Header */}
-                        <div className="bg-blue-600 p-6 text-white text-center">
-                            <h1 className="text-3xl font-bold"><i className="fa-solid fa-calendar-days mr-2"></i> Gerador de Grade Curricular</h1>
-                            <p className="mt-2 opacity-80">Organize os horários de turmas e professores facilmente</p>
+                        <div className="bg-gradient-to-r from-purple-900 to-[#3b0764] p-8 text-white text-center border-b border-purple-800">
+                            <h1 className="text-4xl font-extrabold tracking-tight"><i className="fa-solid fa-calendar-days mr-3 text-purple-400"></i> Gerador Curricular</h1>
+                            <p className="mt-3 text-purple-200 font-medium">Organize horários e professores de forma inteligente e sem choques</p>
                         </div>
 
-                        {/* Steps Indicator */}
-                        <div className="flex border-b">
-                            <div className={`flex-1 text-center py-4 font-semibold ${step === 1 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>1. Horários</div>
-                            <div className={`flex-1 text-center py-4 font-semibold ${step === 2 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>2. Professores e Turmas</div>
-                            <div className={`flex-1 text-center py-4 font-semibold ${step === 3 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400'}`}>3. Grade Gerada</div>
+                        <div className="flex bg-[#191024]">
+                            <div className={`flex-1 text-center py-4 text-sm uppercase tracking-wider font-bold transition-colors ${step === 1 ? 'border-b-4 border-purple-500 text-purple-400 bg-[#221533]' : 'text-gray-500 border-b border-purple-900/50'}`}>1. Horários</div>
+                            <div className={`flex-1 text-center py-4 text-sm uppercase tracking-wider font-bold transition-colors ${step === 2 ? 'border-b-4 border-purple-500 text-purple-400 bg-[#221533]' : 'text-gray-500 border-b border-purple-900/50'}`}>2. Professores</div>
+                            <div className={`flex-1 text-center py-4 text-sm uppercase tracking-wider font-bold transition-colors ${step === 3 ? 'border-b-4 border-purple-500 text-purple-400 bg-[#221533]' : 'text-gray-500 border-b border-purple-900/50'}`}>3. Resultado</div>
                         </div>
 
                         <div className="p-8">
                             
                             {/* STEP 1 */}
                             {step === 1 && (
-                                <div className="fade-in space-y-6">
-                                    <h2 className="text-2xl font-bold text-gray-700">Configuração de Horários</h2>
+                                <div className="fade-in space-y-8">
+                                    <h2 className="text-2xl font-bold text-purple-300 border-b border-purple-900/50 pb-2">Configuração da Grade Diária</h2>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-600 mb-2">Quantas aulas por dia?</label>
-                                        <input type="number" min="1" value={numAulasDia} onChange={(e) => changeNumAulas(e.target.value)} className="w-32 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200 focus:outline-none" />
+                                        <label className="block text-sm font-semibold text-purple-400 mb-2">Quantas aulas por dia cada turma terá?</label>
+                                        <input type="number" min="1" value={numAulasDia} onChange={(e) => changeNumAulas(e.target.value)} className="w-32 px-4 py-3 bg-[#0b0510] border border-purple-800/80 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none text-white font-medium" />
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-6">
                                         {horarios.map((h, i) => (
-                                            <div key={i}>
-                                                <label className="block text-xs text-gray-500 mb-1">Horário {i + 1}</label>
-                                                <input type="text" value={h} onChange={(e) => updateHorario(i, e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200 focus:outline-none" placeholder="Ex: 8h00" />
+                                            <div key={i} className="bg-[#1a1025] p-3 rounded-xl border border-purple-900/50">
+                                                <label className="block text-xs text-purple-500/70 mb-1 font-bold uppercase tracking-wider">Horário {i + 1}</label>
+                                                <input type="text" value={h} onChange={(e) => updateHorario(i, e.target.value)} className="w-full px-3 py-2 bg-[#0b0510] border border-purple-800/50 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none text-white text-center font-medium" placeholder="Ex: 8h00" />
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="mt-8 flex justify-end">
-                                        <button onClick={() => setStep(2)} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Próximo Passo <i className="fa-solid fa-arrow-right ml-2"></i></button>
+                                    <div className="mt-10 flex justify-end">
+                                        <button onClick={() => setStep(2)} className="bg-purple-600 text-white px-8 py-3 rounded-xl hover:bg-purple-500 transition-all font-bold shadow-[0_0_15px_rgba(147,51,234,0.3)] hover:shadow-[0_0_25px_rgba(147,51,234,0.5)]">
+                                            Próximo Passo <i className="fa-solid fa-arrow-right ml-2"></i>
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -250,132 +341,171 @@
                             {/* STEP 2 */}
                             {step === 2 && (
                                 <div className="fade-in space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold text-gray-700">Matérias e Professores</h2>
-                                        <button onClick={addMateria} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition"><i className="fa-solid fa-plus mr-2"></i> Adicionar Matéria</button>
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-purple-900/50 pb-4">
+                                        <h2 className="text-2xl font-bold text-purple-300">Quadro de Professores</h2>
+                                        <button onClick={addMateria} className="mt-4 sm:mt-0 bg-[#d946ef] text-white px-5 py-2.5 rounded-xl hover:bg-[#c026d3] transition-all font-bold shadow-[0_0_15px_rgba(217,70,239,0.3)]">
+                                            <i className="fa-solid fa-plus mr-2"></i> Adicionar Matéria
+                                        </button>
                                     </div>
 
                                     {materias.length === 0 && (
-                                        <div className="text-center py-10 text-gray-400">Nenhuma matéria adicionada. Clique no botão acima para começar.</div>
+                                        <div className="text-center py-16 bg-[#1a1025] border border-dashed border-purple-800/50 rounded-2xl">
+                                            <i className="fa-solid fa-book-open text-4xl text-purple-900 mb-4"></i>
+                                            <p className="text-purple-400 font-medium">Nenhuma matéria adicionada.</p>
+                                            <p className="text-sm text-purple-600/70 mt-1">Clique no botão acima para iniciar o cadastro.</p>
+                                        </div>
                                     )}
 
-                                    {materias.map((mat, matIdx) => (
-                                        <div key={mat.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative">
-                                            <button onClick={() => removeMateria(matIdx)} className="absolute top-4 right-4 text-red-500 hover:text-red-700"><i className="fa-solid fa-trash"></i></button>
-                                            
-                                            <div className="flex items-center space-x-4 mb-4">
-                                                <label className="font-semibold">Sigla da Matéria:</label>
-                                                <input type="text" value={mat.sigla} onChange={(e) => updateMateria(matIdx, e.target.value)} className="px-3 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Ex: MAT" />
-                                            </div>
-
-                                            <div className="pl-4 border-l-2 border-blue-200 space-y-4">
-                                                {mat.professores.map((prof, profIdx) => (
-                                                    <div key={prof.id} className="bg-white border rounded p-4 relative shadow-sm">
-                                                        <button onClick={() => removeProfessor(matIdx, profIdx)} className="absolute top-4 right-4 text-red-500 hover:text-red-700"><i className="fa-solid fa-times"></i></button>
-                                                        
-                                                        <div className="flex items-center space-x-4 mb-3">
-                                                            <label className="font-semibold text-sm">Professor:</label>
-                                                            <input type="text" value={prof.nome} onChange={(e) => updateProfessor(matIdx, profIdx, e.target.value)} className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Nome do Professor" />
-                                                        </div>
-
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                                            {/* Turmas do Professor */}
-                                                            <div>
-                                                                <div className="flex justify-between items-center mb-2">
-                                                                    <span className="text-sm font-semibold text-gray-600">Turmas:</span>
-                                                                    <button onClick={() => addTurmaAoProfessor(matIdx, profIdx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">+ Turma</button>
-                                                                </div>
-                                                                {prof.turmas.map((turma, turmaIdx) => (
-                                                                    <div key={turma.id} className="flex space-x-2 mb-2 items-center">
-                                                                        <input type="text" placeholder="Turma (Ex: 1A)" value={turma.nome} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'nome', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm" />
-                                                                        <input type="number" min="1" placeholder="Aulas" value={turma.aulas} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'aulas', e.target.value)} className="w-1/3 px-2 py-1 border rounded text-sm" />
-                                                                        <button onClick={() => removeTurma(matIdx, profIdx, turmaIdx)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-minus-circle"></i></button>
-                                                                    </div>
-                                                                ))}
-                                                                {prof.turmas.length === 0 && <p className="text-xs text-gray-400">Nenhuma turma adicionada.</p>}
-                                                            </div>
-
-                                                            {/* Indisponibilidades */}
-                                                            <div>
-                                                                <div className="flex justify-between items-center mb-2">
-                                                                    <span className="text-sm font-semibold text-gray-600">Indisponibilidades:</span>
-                                                                    <button onClick={() => addIndisponibilidade(matIdx, profIdx)} className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200">+ Indisponibilidade</button>
-                                                                </div>
-                                                                {prof.indisponibilidades.map((ind, indIdx) => (
-                                                                    <div key={ind.id} className="flex space-x-2 mb-2 items-center">
-                                                                        <select value={ind.dia} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'dia', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm">
-                                                                            {DIAS.map(d => <option key={d} value={d}>{d}</option>)}
-                                                                        </select>
-                                                                        <select value={ind.hora} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'hora', e.target.value)} className="w-1/2 px-2 py-1 border rounded text-sm">
-                                                                            {horarios.map(h => <option key={h} value={h}>{h || '-'}</option>)}
-                                                                        </select>
-                                                                        <button onClick={() => removeIndisponibilidade(matIdx, profIdx, indIdx)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-minus-circle"></i></button>
-                                                                    </div>
-                                                                ))}
-                                                                {prof.indisponibilidades.length === 0 && <p className="text-xs text-gray-400">Nenhuma restrição.</p>}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                    <div className="space-y-6">
+                                        {materias.map((mat, matIdx) => (
+                                            <div key={mat.id} className="border border-purple-800/50 rounded-2xl p-5 sm:p-6 bg-[#1a1025] relative shadow-lg">
+                                                <button onClick={() => removeMateria(matIdx)} className="absolute top-5 right-5 text-red-400 hover:text-red-300 transition-colors bg-red-900/20 p-2 rounded-lg">
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
                                                 
-                                                <button onClick={() => addProfessor(matIdx)} className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"><i className="fa-solid fa-user-plus mr-1"></i> Adicionar Professor para {mat.sigla || "esta matéria"}</button>
+                                                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-6">
+                                                    <label className="font-bold text-purple-300">Sigla da Matéria:</label>
+                                                    <input type="text" value={mat.sigla} onChange={(e) => updateMateria(matIdx, e.target.value)} className="w-full sm:w-48 px-4 py-2 bg-[#0b0510] border border-purple-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold text-purple-100" placeholder="Ex: MAT" />
+                                                </div>
+
+                                                <div className="pl-2 sm:pl-6 border-l-2 border-purple-800/50 space-y-5">
+                                                    {mat.professores.map((prof, profIdx) => (
+                                                        <div key={prof.id} className="bg-[#130b1c] border border-purple-900/50 rounded-xl p-4 sm:p-5 relative shadow-md">
+                                                            <button onClick={() => removeProfessor(matIdx, profIdx)} className="absolute top-4 right-4 text-purple-500/50 hover:text-red-400 transition-colors">
+                                                                <i className="fa-solid fa-times text-lg"></i>
+                                                            </button>
+                                                            
+                                                            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-5">
+                                                                <label className="font-bold text-purple-400 text-sm">Professor:</label>
+                                                                <input type="text" value={prof.nome} onChange={(e) => updateProfessor(matIdx, profIdx, e.target.value)} className="w-full sm:w-64 px-4 py-2 bg-[#0b0510] border border-purple-800/80 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-purple-100" placeholder="Nome do Professor" />
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                                                                <div className="bg-[#1a1025] p-4 rounded-xl border border-purple-900/30">
+                                                                    <div className="flex justify-between items-center mb-4">
+                                                                        <span className="text-sm font-bold text-purple-300">Turmas Atendidas</span>
+                                                                        <button onClick={() => addTurmaAoProfessor(matIdx, profIdx)} className="text-xs font-bold bg-purple-900/40 text-purple-300 px-3 py-1.5 rounded-lg hover:bg-purple-800/60 transition-colors">
+                                                                            + Adicionar
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        {prof.turmas.map((turma, turmaIdx) => (
+                                                                            <div key={turma.id} className="flex space-x-2 items-center">
+                                                                                <input type="text" placeholder="Turma" value={turma.nome} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'nome', e.target.value)} className="w-1/2 px-3 py-2 bg-[#0b0510] border border-purple-800/50 rounded-lg text-sm text-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500" />
+                                                                                <input type="number" min="1" placeholder="Aulas" value={turma.aulas} onChange={(e) => updateTurma(matIdx, profIdx, turmaIdx, 'aulas', e.target.value)} className="w-1/3 px-3 py-2 bg-[#0b0510] border border-purple-800/50 rounded-lg text-sm text-center text-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500" />
+                                                                                <button onClick={() => removeTurma(matIdx, profIdx, turmaIdx)} className="text-purple-600 hover:text-red-400 p-2"><i className="fa-solid fa-minus-circle"></i></button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    {prof.turmas.length === 0 && <p className="text-xs text-purple-700/50 mt-2 font-medium">Nenhuma turma adicionada.</p>}
+                                                                </div>
+
+                                                                <div className="bg-[#1a1025] p-4 rounded-xl border border-purple-900/30">
+                                                                    <div className="flex justify-between items-center mb-4">
+                                                                        <span className="text-sm font-bold text-purple-300">Indisponibilidades</span>
+                                                                        <button onClick={() => addIndisponibilidade(matIdx, profIdx)} className="text-xs font-bold bg-orange-900/30 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-900/50 transition-colors">
+                                                                            + Adicionar
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        {prof.indisponibilidades.map((ind, indIdx) => (
+                                                                            <div key={ind.id} className="flex space-x-2 items-center">
+                                                                                <select value={ind.dia} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'dia', e.target.value)} className="w-1/2 px-3 py-2 bg-[#0b0510] border border-purple-800/50 rounded-lg text-sm text-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                                                                                    {DIAS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                                                </select>
+                                                                                <select value={ind.hora} onChange={(e) => updateIndisponibilidade(matIdx, profIdx, indIdx, 'hora', e.target.value)} className="w-1/2 px-3 py-2 bg-[#0b0510] border border-purple-800/50 rounded-lg text-sm text-purple-100 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                                                                                    {horarios.map(h => <option key={h} value={h}>{h || '-'}</option>)}
+                                                                                </select>
+                                                                                <button onClick={() => removeIndisponibilidade(matIdx, profIdx, indIdx)} className="text-purple-600 hover:text-red-400 p-2"><i className="fa-solid fa-minus-circle"></i></button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    {prof.indisponibilidades.length === 0 && <p className="text-xs text-purple-700/50 mt-2 font-medium">Livre em todos os horários.</p>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    
+                                                    <button onClick={() => addProfessor(matIdx)} className="mt-3 inline-flex items-center text-sm font-bold text-purple-400 hover:text-purple-300 transition-colors bg-purple-900/20 px-4 py-2 rounded-lg">
+                                                        <i className="fa-solid fa-user-plus mr-2"></i> Novo Professor para {mat.sigla || "esta matéria"}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {erroGeracao && (
+                                        <div className="bg-red-900/30 border border-red-500/50 text-red-200 px-5 py-4 rounded-xl relative flex items-start space-x-3 mt-6">
+                                            <i className="fa-solid fa-triangle-exclamation text-red-500 mt-1"></i>
+                                            <div>
+                                                <strong className="font-bold text-red-400 block mb-1">Aviso Crítico</strong>
+                                                <span className="block text-sm leading-relaxed">{erroGeracao}</span>
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
 
-                                    <div className="mt-8 flex justify-between">
-                                        <button onClick={() => setStep(1)} className="text-gray-500 px-6 py-2 rounded-lg hover:bg-gray-100 transition">Voltar</button>
-                                        <button onClick={gerarGrade} className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"><i className="fa-solid fa-wand-magic-sparkles mr-2"></i> Gerar Grade</button>
+                                    <div className="mt-10 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                                        <button onClick={() => setStep(1)} className="text-purple-400 hover:text-purple-300 font-medium px-6 py-2 transition-colors">
+                                            <i className="fa-solid fa-arrow-left mr-2"></i> Voltar
+                                        </button>
+                                        <button onClick={gerarGrade} disabled={isGenerating} className={`w-full sm:w-auto text-white px-10 py-3.5 rounded-xl font-bold transition-all shadow-lg text-lg ${isGenerating ? 'bg-purple-900/50 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-[#d946ef] hover:from-purple-500 hover:to-[#e879f9] shadow-[0_0_20px_rgba(217,70,239,0.4)]'}`}>
+                                            <i className={`fa-solid ${isGenerating ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'} mr-2`}></i> 
+                                            {isGenerating ? 'Processando Grade...' : 'Gerar Grade Mágica'}
+                                        </button>
                                     </div>
                                 </div>
                             )}
 
                             {/* STEP 3 */}
                             {step === 3 && grade && (
-                                <div className="fade-in space-y-8">
-                                    <h2 className="text-2xl font-bold text-gray-700">Grades Geradas</h2>
+                                <div className="fade-in space-y-10">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center border-b border-purple-900/50 pb-4">
+                                        <h2 className="text-2xl font-bold text-purple-300"><i className="fa-solid fa-check-circle text-green-400 mr-2"></i> Grades Geradas</h2>
+                                        <button onClick={() => window.print()} className="mt-4 sm:mt-0 bg-purple-600 text-white px-5 py-2.5 rounded-xl hover:bg-purple-500 transition-all font-bold shadow-[0_0_15px_rgba(147,51,234,0.3)] no-print">
+                                            <i className="fa-solid fa-print mr-2"></i> Imprimir Tudo
+                                        </button>
+                                    </div>
                                     
-                                    {turmasDisponiveis.map(turma => (
-                                        <div key={turma} className="bg-white border rounded-xl overflow-hidden shadow-sm">
-                                            <div className="bg-gray-800 text-white px-4 py-3 font-bold text-lg">
-                                                Turma: {turma}
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-sm text-left">
-                                                    <thead className="bg-gray-100 text-gray-600 font-medium border-b">
-                                                        <tr>
-                                                            <th className="px-4 py-3">Horário</th>
-                                                            {DIAS.map(d => <th key={d} className="px-4 py-3">{d}</th>)}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {horarios.map(hora => (
-                                                            <tr key={hora} className="border-b last:border-0 hover:bg-gray-50">
-                                                                <td className="px-4 py-3 font-semibold text-gray-700 bg-gray-50">{hora}</td>
-                                                                {DIAS.map(dia => {
-                                                                    const aula = grade[turma][dia][hora];
-                                                                    const isVago = aula === "—";
-                                                                    return (
-                                                                        <td key={dia} className={`px-4 py-3 ${isVago ? 'text-gray-400 italic' : 'text-gray-800 font-medium'}`}>
-                                                                            {aula}
-                                                                        </td>
-                                                                    );
-                                                                })}
+                                    <div id="printable-area" className="space-y-8">
+                                        {turmasDisponiveis.map(turma => (
+                                            <div key={turma} className="bg-[#1a1025] print-bg-dark border border-purple-800/50 rounded-2xl overflow-hidden shadow-lg print-border">
+                                                <div className="bg-gradient-to-r from-[#2e1065] to-purple-900 print-bg-dark px-5 py-4 font-extrabold text-xl text-purple-100 print-text-dark border-b border-purple-800/50">
+                                                    TURMA: {turma}
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm text-left">
+                                                        <thead className="bg-[#130b1c] text-purple-400 font-bold uppercase tracking-wider text-xs border-b border-purple-800/50 print-bg-dark">
+                                                            <tr>
+                                                                <th className="px-5 py-4"><i className="fa-regular fa-clock mr-1"></i> Horário</th>
+                                                                {DIAS.map(d => <th key={d} className="px-5 py-4">{d}</th>)}
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-purple-900/30">
+                                                            {horarios.map(hora => (
+                                                                <tr key={hora} className="hover:bg-purple-900/20 transition-colors">
+                                                                    <td className="px-5 py-4 font-bold text-purple-300 bg-[#130b1c]/50 print-bg-dark">{hora}</td>
+                                                                    {DIAS.map(dia => {
+                                                                        const aula = grade[turma][dia][hora];
+                                                                        const isVago = aula === "—";
+                                                                        return (
+                                                                            <td key={dia} className={`px-5 py-4 ${isVago ? 'text-purple-700/50 italic' : 'text-purple-100 font-semibold print-text-dark'}`}>
+                                                                                {isVago ? 'Vago' : aula}
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
 
-                                    {turmasDisponiveis.length === 0 && (
-                                        <div className="text-center py-10 text-gray-500">Nenhuma turma encontrada para gerar a grade.</div>
-                                    )}
-
-                                    <div className="mt-8 flex justify-center">
-                                        <button onClick={() => setStep(2)} className="text-gray-500 px-6 py-2 rounded-lg hover:bg-gray-100 transition mr-4">Editar Dados</button>
-                                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"><i className="fa-solid fa-print mr-2"></i> Imprimir Grade</button>
+                                    <div className="mt-12 flex justify-center no-print pt-6 border-t border-purple-900/50">
+                                        <button onClick={() => setStep(2)} className="text-purple-400 bg-purple-900/20 px-8 py-3 rounded-xl hover:bg-purple-900/40 font-bold transition-all border border-purple-800/30">
+                                            <i className="fa-solid fa-pen mr-2"></i> Editar Dados Inseridos
+                                        </button>
                                     </div>
                                 </div>
                             )}

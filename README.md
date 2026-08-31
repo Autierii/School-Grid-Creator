@@ -1,74 +1,59 @@
 # 🧮 Gerador de Grade Curricular
 
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge)
-![Web](https://img.shields.io/badge/Web-Frontend-blue?style=for-the-badge&logo=html5)
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
+![Web](https://img.shields.io/badge/Web-Frontend-purple?style=for-the-badge&logo=react)
+![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
 ---
 
 ## 📘 Descrição
 
-Este projeto é um **gerador automático de grade curricular** que permite organizar aulas, professores, turmas e horários respeitando indisponibilidades e limites de carga horária.
+Este projeto é um **gerador automático de grade curricular** voltado para facilitar a vida de coordenadores pedagógicos na hora de distribuir turmas, professores e horários.
 
-Ele foi criado para facilitar a **distribuição de aulas** semanais em escolas e faculdades, garantindo que:
-- Um professor não seja escalado para duas turmas no mesmo horário;
-- Horários de indisponibilidade sejam respeitados;
-- As aulas sejam distribuídas de forma equilibrada ao longo da semana.
+Através de uma interface web moderna (Dark Purple Theme), o sistema calcula matematicamente (usando um algoritmo profissional de _Constraint Satisfaction Problem - Backtracking_) a melhor forma de distribuir as aulas na semana.
 
-O projeto foi totalmente refeito para incluir uma **Interface Web (Frontend)** moderna, feita com React e Tailwind CSS, sem perder a versão original em Python.
-
----
-
-## 🚀 Como Executar (Interface Web - Novo!)
-
-A maneira mais fácil e visual de usar o gerador agora é através da interface web interativa.
-
-1. Navegue até a pasta do projeto.
-2. Abra o arquivo `index.html` em qualquer navegador moderno (Chrome, Firefox, Edge, Safari).
-   - Você pode simplesmente dar um **duplo clique** no arquivo `index.html`.
-3. Siga o passo a passo na tela para configurar horários, professores e gerar a grade.
-4. Você pode imprimir a grade diretamente do navegador ao final!
+Ele garante que:
+- Um professor **não seja escalado** para duas turmas no mesmo horário (zero choques).
+- **Horários de indisponibilidade** de cada professor sejam estritamente respeitados.
+- As matérias não se concentrem num único dia (limite automático de no máximo 2 aulas da mesma matéria por dia).
+- Impressão otimizada do quadro de horários final.
 
 ---
 
-## 🚀 Como Executar (Versão Terminal Python)
+## 🚀 Como Usar
 
-Se preferir usar a versão original via terminal:
+O projeto foi totalmente refeito para não exigir **nenhuma instalação de software, servidor ou linha de comando**. Tudo funciona diretamente no seu navegador!
 
-### ✅ Pré-requisitos
-- Python 3.10 ou superior instalado
+### Passo a Passo:
 
-### 🧭 Execução
+1. **Abra o arquivo:**
+   - Navegue até a pasta do projeto no seu computador.
+   - Dê um **duplo clique** no arquivo `index.html`.
 
-```bash
-# Executar o script Python
-python GradeCurricular.py
-```
+2. **No Navegador:**
+   - O sistema abrirá em qualquer navegador moderno (Chrome, Edge, Safari, Firefox).
+   - Siga os passos intuitivos na tela para configurar seus horários, adicionar professores e turmas.
 
-O sistema pedirá as informações via terminal e, ao final, exibirá a grade de horários.
+3. **Gerar e Imprimir:**
+   - Clique em **"Gerar Grade Mágica"**. O algoritmo fará os cálculos.
+   - Você pode clicar no botão de **Imprimir** para salvar a grade em PDF ou mandar para a impressora.
 
 ---
 
-## 🧠 Funcionalidades
+## 🧠 Lógica e Algoritmo
 
-- Inserção interativa de:
-  - Matérias
-  - Professores
-  - Turmas
-  - Indisponibilidades
-- Geração automática da grade semanal usando algoritmo guloso
-- Respeito a restrições de horários e carga semanal
-- **[NOVO]** Interface gráfica fácil de usar
-- **[NOVO]** Opção de impressão das grades geradas na web
+O coração do gerador funciona através de **Backtracking**. 
+Ao contrário de algoritmos gulosos simples, este gerador "pensa no futuro". Se ele alocar um professor na segunda-feira e perceber que isso fará a grade de sexta-feira quebrar, ele automaticamente volta atrás e testa novas combinações até encontrar o encaixe perfeito para toda a escola. 
+
+Caso você insira configurações impossíveis (ex: mais aulas do que horários disponíveis), o sistema emitirá um alerta inteligente apontando o conflito.
 
 ---
 
 ## 🧱 Estrutura do Projeto
 
 ```
-index.html            # Nova interface Web Completa (React + Tailwind)
-GradeCurricular.py    # Código principal em Python (Terminal)
-README.md             # Documentação
+index.html    # Arquivo único contendo Interface (React/Tailwind) e Lógica (Algoritmo)
+README.md     # Esta documentação
 ```
 
 ---
