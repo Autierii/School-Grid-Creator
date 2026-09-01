@@ -296,18 +296,30 @@
                     return null;
                 }
                 try {
-                    const response = await fetch('https://api.cohere.ai/v1/chat', {
+                    const response = await fetch('https://api.cohere.ai/v2/chat', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${cohereKey}`,
                             'Content-Type': 'application/json',
                             'Accept': 'application/json'
                         },
-                        body: JSON.stringify({ model: "command-r-plus", message: promptMsg, temperature: 0.1 })
+                        body: JSON.stringify({
+                            model: "command-r-08-2024",
+                            messages: [{ role: "user", content: promptMsg }],
+                            temperature: 0.1,
+                            response_format: { type: "json_object" },
+                            max_tokens: 4000
+                        })
                     });
-                    if (!response.ok) throw new Error("Falha de comunicação com a API. Verifique a chave.");
+                    
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.message || "Falha de comunicação com a API.");
+                    }
+                    
                     const data = await response.json();
-                    return data.text;
+                    const textObj = data.message?.content?.find(c => c.type === 'text');
+                    return textObj ? textObj.text : "";
                 } catch (e) {
                     alert("Ocorreu um erro ao processar a requisição: " + e.message);
                     return null;
