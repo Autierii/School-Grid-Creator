@@ -61,7 +61,15 @@
             const [aiLoading, setAiLoading] = useState(false);
             const [aiStatus, setAiStatus] = useState("");
             const [aiText, setAiText] = useState("");
+            const [apiLimits, setApiLimits] = useState(null);
             const fileInputRef = useRef(null);
+            const jsonFileInputRef = useRef(null);
+
+            React.useEffect(() => {
+                if (materias && materias.length > 0) {
+                    localStorage.setItem('grid_creator_auto_backup', JSON.stringify({ numAulasDia, horarios, materias }));
+                }
+            }, [materias, horarios, numAulasDia]);
 
             const saveKey = (key) => {
                 setCohereKey(key);
@@ -141,20 +149,81 @@
                 setMaterias(newMaterias);
             };
 
-            const gerarGrade = () => {
+            const salvarConfiguracao = () => {
+                const dataToSave = {
+                    numAulasDia,
+                    horarios,
+                    materias
+                };
+                localStorage.setItem('grid_creator_saved_state', JSON.stringify(dataToSave));
+                alert("Configuração e demandas salvas com sucesso no navegador!");
+            };
+
+            const carregarConfiguracao = () => {
+                const saved = localStorage.getItem('grid_creator_saved_state');
+                if (!saved) {
+                    alert("Nenhuma configuração salva anteriormente foi encontrada.");
+                    return;
+                }
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.numAulasDia) setNumAulasDia(parsed.numAulasDia);
+                    if (parsed.horarios) setHorarios(parsed.horarios);
+                    if (parsed.materias) setMaterias(parsed.materias);
+                    setStep(2);
+                    alert("Configuração anterior restaurada com sucesso!");
+                } catch (e) {
+                    alert("Erro ao carregar dados salvos: " + e.message);
+                }
+            };
+
+            const exportarConfiguracaoJSON = () => {
+                const dataToSave = {
+                    numAulasDia,
+                    horarios,
+                    materias
+                };
+                const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'configuracao_escola.json';
+                a.click();
+            };
+
+            const importarConfiguracaoJSON = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if (parsed.numAulasDia) setNumAulasDia(parsed.numAulasDia);
+                        if (parsed.horarios) setHorarios(parsed.horarios);
+                        if (parsed.materias) setMaterias(parsed.materias);
+                        setStep(2);
+                        alert("Arquivo JSON de configuração carregado com sucesso!");
+                    } catch (err) {
+                        alert("Erro ao ler arquivo JSON: " + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const gerarGrade = async () => {
                 setIsGenerating(true);
                 setErroGeracao("");
                 
-                setTimeout(() => {
-                    const success = resolverGrade();
-                    setIsGenerating(false);
-                    if (success) {
-                        setStep(3);
-                    }
-                }, 50);
+                await new Promise(r => setTimeout(r, 50));
+                
+                const success = await resolverGrade();
+                setIsGenerating(false);
+                if (success) {
+                    setStep(3);
+                }
             };
 
-            const resolverGrade = () => {
+            const resolverGrade = async () => {
                 const turmasSet = new Set();
                 let requirements = [];
                 let indispMap = {};
@@ -170,7 +239,7 @@
                         prof.turmas.forEach(turma => {
                             if (!turma.nome || parseInt(turma.aulas) <= 0) return;
                             turmasSet.add(turma.nome);
-                            requirements.push({ mat: mat.sigla, prof: prof.nome, turma: turma.nome, total: parseInt(turma.aulas), remaining: parseInt(turma.aulas) });
+                            requirements.push({ mat: mat.sigla, prof: prof.nome, turma: turma.nome, total: parseInt(turma.aulas) });
                             requiredHoursCount += parseInt(turma.aulas);
                         });
                     });
@@ -179,7 +248,8 @@
                 const turmasList = Array.from(turmasSet);
                 setTurmasDisponiveis(turmasList);
 
-                const maxCapacity = turmasList.length * DIAS.length * horarios.length;
+                const slotsPerTurma = DIAS.length * horarios.length;
+                const maxCapacity = turmasList.length * slotsPerTurma;
                 if (requiredHoursCount > maxCapacity) {
                     setErroGeracao(`Capacidade excedida. Exigido: ${requiredHoursCount} aulas. Capacidade máxima: ${maxCapacity}.`);
                     return false;
@@ -187,100 +257,182 @@
                 
                 for (let t of turmasList) {
                     const reqsTurma = requirements.filter(r => r.turma === t).reduce((sum, r) => sum + r.total, 0);
-                    if (reqsTurma > DIAS.length * horarios.length) {
-                        setErroGeracao(`Conflito: A turma ${t} exige ${reqsTurma} aulas, mas o quadro semanal possui apenas ${DIAS.length * horarios.length} horários disponíveis.`);
+                    if (reqsTurma > slotsPerTurma) {
+                        setErroGeracao(`Conflito: A turma ${t} exige ${reqsTurma} aulas, mas o quadro semanal possui apenas ${slotsPerTurma} horários disponíveis.`);
                         return false;
                     }
                 }
 
-                let timetable = {};
-                turmasList.forEach(t => {
-                    timetable[t] = {};
-                    DIAS.forEach(d => {
-                        timetable[t][d] = {};
-                        horarios.forEach(h => timetable[t][d][h] = -1);
+                // Cria instâncias individuais de cada aula
+                const classItems = [];
+                requirements.forEach((r, rIdx) => {
+                    for (let i = 0; i < r.total; i++) {
+                        classItems.push({
+                            id: classItems.length,
+                            turma: r.turma,
+                            prof: r.prof,
+                            mat: r.mat
+                        });
+                    }
+                });
+
+                // Cria coordenadas dos slots semanais
+                const allSlots = [];
+                DIAS.forEach(d => {
+                    horarios.forEach(h => {
+                        allSlots.push({ d, h });
                     });
                 });
 
-                let solved = false;
-                let iterations = 0;
-                const MAX_ITERATIONS = 80000;
+                // Agrupa as aulas por turma e preenche com vago se necessário
+                const turmaClasses = {};
+                turmasList.forEach(t => {
+                    const items = classItems.filter(c => c.turma === t);
+                    while (items.length < slotsPerTurma) {
+                        items.push({ id: -1, turma: t, prof: "", mat: "—" });
+                    }
+                    turmaClasses[t] = items;
+                });
 
-                const isSafe = (req, t, d, h) => {
-                    if (req.turma !== t) return false;
-                    if (req.remaining <= 0) return false;
-                    if (indispMap[req.prof] && indispMap[req.prof].has(`${d}-${h}`)) return false;
-
-                    for (let otherT of turmasList) {
-                        if (otherT !== t) {
-                            const otherReqIdx = timetable[otherT][d][h];
-                            if (otherReqIdx !== -1) {
-                                const otherReq = requirements[otherReqIdx];
-                                if (otherReq.prof === req.prof) return false;
+                // Funções de avaliação de conflitos
+                function getSlotConflicts(timetable, sIdx) {
+                    const slot = allSlots[sIdx];
+                    let conf = 0;
+                    const profsInSlot = new Set();
+                    for (let t of turmasList) {
+                        const c = timetable[t][sIdx];
+                        if (c && c.id !== -1) {
+                            if (profsInSlot.has(c.prof)) {
+                                conf += 20; // Penalidade choque de professor no mesmo horário
+                            } else {
+                                profsInSlot.add(c.prof);
+                            }
+                            if (indispMap[c.prof] && indispMap[c.prof].has(`${slot.d}-${slot.h}`)) {
+                                conf += 20; // Penalidade professor alocado em horário bloqueado
                             }
                         }
                     }
+                    return conf;
+                }
 
-                    let sameSubjectCount = 0;
-                    for (let otherH of horarios) {
-                        const assignedReqIdx = timetable[t][d][otherH];
-                        if (assignedReqIdx !== -1 && requirements[assignedReqIdx].mat === req.mat) {
-                            sameSubjectCount++;
-                        }
-                    }
-                    if (sameSubjectCount >= 2) return false;
-
-                    return true;
-                };
-
-                const solve = (reqIdxToAssignList) => {
-                    iterations++;
-                    if (iterations > MAX_ITERATIONS) return false;
-
-                    let pendingReqs = reqIdxToAssignList.filter(i => requirements[i].remaining > 0);
-                    if (pendingReqs.length === 0) return true;
-
-                    pendingReqs.sort((a,b) => requirements[b].remaining - requirements[a].remaining);
-                    const reqIdx = pendingReqs[0];
-                    const req = requirements[reqIdx];
-
-                    let validSlots = [];
-                    for (let d of DIAS) {
-                        for (let h of horarios) {
-                            if (timetable[req.turma][d][h] === -1 && isSafe(req, req.turma, d, h)) {
-                                validSlots.push({d, h});
+                function getTurmaDayConflicts(timetable, t, dIdx) {
+                    const subjectCounts = {};
+                    let conf = 0;
+                    for (let hIdx = 0; hIdx < horarios.length; hIdx++) {
+                        const sIdx = dIdx * horarios.length + hIdx;
+                        const c = timetable[t][sIdx];
+                        if (c && c.id !== -1) {
+                            subjectCounts[c.mat] = (subjectCounts[c.mat] || 0) + 1;
+                            if (subjectCounts[c.mat] > 2) {
+                                conf += 2; // Penalidade mais de 2 aulas da mesma matéria no mesmo dia
                             }
                         }
                     }
+                    return conf;
+                }
 
-                    if (validSlots.length === 0) return false;
-
-                    for (let slot of validSlots) {
-                        timetable[req.turma][slot.d][slot.h] = reqIdx;
-                        req.remaining -= 1;
-                        if (solve(pendingReqs)) return true;
-                        timetable[req.turma][slot.d][slot.h] = -1;
-                        req.remaining += 1;
+                function countTotalConflicts(timetable) {
+                    let total = 0;
+                    for (let s = 0; s < slotsPerTurma; s++) {
+                        total += getSlotConflicts(timetable, s);
                     }
-                    return false;
-                };
+                    for (let t of turmasList) {
+                        for (let d = 0; d < DIAS.length; d++) {
+                            total += getTurmaDayConflicts(timetable, t, d);
+                        }
+                    }
+                    return total;
+                }
 
-                let reqIdxsInit = Array.from({length: requirements.length}, (_, i) => i);
-                solved = solve(reqIdxsInit);
+                // Otimização Estocástica (Simulated Annealing + Min-Conflicts)
+                let solvedTimetable = null;
+                const NUM_RESTARTS = 80;
+                const ITERS_PER_RESTART = 5000;
+                let lastYield = Date.now();
 
-                if (!solved) {
-                    setErroGeracao(iterations > MAX_ITERATIONS ? "Erro: O limite de processamento foi atingido. Verifique se as restrições inseridas são matematicamente possíveis." : "Erro: Não foi possível fechar a grade. Há restrições ou choques insolúveis.");
+                for (let restart = 0; restart < NUM_RESTARTS; restart++) {
+                    let currentTimetable = {};
+                    turmasList.forEach(t => {
+                        const items = [...turmaClasses[t]];
+                        // Embaralha slots da turma
+                        for (let i = items.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [items[i], items[j]] = [items[j], items[i]];
+                        }
+                        currentTimetable[t] = items;
+                    });
+
+                    let currentConflicts = countTotalConflicts(currentTimetable);
+                    if (currentConflicts === 0) {
+                        solvedTimetable = currentTimetable;
+                        break;
+                    }
+
+                    let temp = 15.0;
+
+                    for (let iter = 0; iter < ITERS_PER_RESTART; iter++) {
+                        if (Date.now() - lastYield > 20) {
+                            await new Promise(r => setTimeout(r, 0));
+                            lastYield = Date.now();
+                        }
+
+                        const t = turmasList[Math.floor(Math.random() * turmasList.length)];
+                        const s1 = Math.floor(Math.random() * slotsPerTurma);
+                        const s2 = Math.floor(Math.random() * slotsPerTurma);
+                        if (s1 === s2) continue;
+
+                        const d1 = Math.floor(s1 / horarios.length);
+                        const d2 = Math.floor(s2 / horarios.length);
+
+                        const oldConf = getSlotConflicts(currentTimetable, s1) + 
+                                       getSlotConflicts(currentTimetable, s2) + 
+                                       getTurmaDayConflicts(currentTimetable, t, d1) + 
+                                       (d1 !== d2 ? getTurmaDayConflicts(currentTimetable, t, d2) : 0);
+
+                        // Troca de posição
+                        const tempC = currentTimetable[t][s1];
+                        currentTimetable[t][s1] = currentTimetable[t][s2];
+                        currentTimetable[t][s2] = tempC;
+
+                        const newConf = getSlotConflicts(currentTimetable, s1) + 
+                                       getSlotConflicts(currentTimetable, s2) + 
+                                       getTurmaDayConflicts(currentTimetable, t, d1) + 
+                                       (d1 !== d2 ? getTurmaDayConflicts(currentTimetable, t, d2) : 0);
+
+                        const delta = newConf - oldConf;
+
+                        if (delta <= 0 || Math.random() < Math.exp(-delta / temp)) {
+                            currentConflicts += delta;
+                            if (currentConflicts === 0) {
+                                solvedTimetable = currentTimetable;
+                                break;
+                            }
+                        } else {
+                            // Reverte a troca
+                            currentTimetable[t][s2] = currentTimetable[t][s1];
+                            currentTimetable[t][s1] = tempC;
+                        }
+
+                        temp *= 0.9992;
+                    }
+
+                    if (solvedTimetable) break;
+                }
+
+                if (!solvedTimetable) {
+                    setErroGeracao("Aviso: Não foi possível fechar uma grade com 0 choques com essas restrições. Verifique se os bloqueios de professores deixam horários livres suficientes.");
                     return false;
                 }
 
                 let newGrade = {};
                 turmasList.forEach(t => {
                     newGrade[t] = {};
-                    DIAS.forEach(d => {
+                    DIAS.forEach((d, dIdx) => {
                         newGrade[t][d] = {};
-                        horarios.forEach(h => {
-                            const reqIdx = timetable[t][d][h];
-                            newGrade[t][d][h] = reqIdx !== -1 ? `${requirements[reqIdx].mat} (${requirements[reqIdx].prof})` : "—";
+                        horarios.forEach((h, hIdx) => {
+                            const sIdx = dIdx * horarios.length + hIdx;
+                            const c = solvedTimetable[t][sIdx];
+                            newGrade[t][d][h] = (c && c.id !== -1 && c.mat !== "—") ? `${c.mat} (${c.prof})` : "—";
                         });
                     });
                 });
@@ -317,7 +469,24 @@
                         throw new Error(err.message || "Falha de comunicação com a API.");
                     }
                     
+                    let remaining = parseInt(response.headers.get('x-ratelimit-remaining'));
+                    let limit = parseInt(response.headers.get('x-ratelimit-limit'));
+                    
                     const data = await response.json();
+                    
+                    if (isNaN(limit) || limit <= 0) limit = 40;
+                    if (isNaN(remaining)) {
+                        remaining = apiLimits && typeof apiLimits.remaining === 'number' ? Math.max(0, apiLimits.remaining - 1) : 39;
+                    }
+                    const pct = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+                    
+                    setApiLimits({
+                        remaining,
+                        limit,
+                        percent: pct,
+                        tokensUsed: data.usage?.tokens?.output_tokens || 0
+                    });
+
                     const textObj = data.message?.content?.find(c => c.type === 'text');
                     return textObj ? textObj.text : "";
                 } catch (e) {
@@ -326,64 +495,433 @@
                 }
             };
 
+            const cleanJsonString = (str) => {
+                return str.replace(/,\s*([\}\]])/g, '$1');
+            };
+
+            const repairTruncatedJson = (jsonStr) => {
+                if (!jsonStr || typeof jsonStr !== 'string') return null;
+                let s = jsonStr.trim();
+                const firstBrace = s.indexOf('{');
+                const firstBracket = s.indexOf('[');
+                let startIdx = 0;
+                if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+                    startIdx = firstBrace;
+                } else if (firstBracket !== -1) {
+                    startIdx = firstBracket;
+                }
+                s = s.substring(startIdx);
+                
+                let inString = false;
+                let isEscaped = false;
+                let stack = [];
+                for (let i = 0; i < s.length; i++) {
+                    const char = s[i];
+                    if (isEscaped) { isEscaped = false; continue; }
+                    if (char === '\\') { isEscaped = true; continue; }
+                    if (char === '"') { inString = !inString; continue; }
+                    if (!inString) {
+                        if (char === '{' || char === '[') stack.push(char === '{' ? '}' : ']');
+                        else if (char === '}' || char === ']') {
+                            if (stack.length > 0 && stack[stack.length - 1] === char) stack.pop();
+                        }
+                    }
+                }
+                if (inString) s += '"';
+                s = s.replace(/,\s*$/, '');
+                while (stack.length > 0) {
+                    s = s.replace(/,\s*$/, '');
+                    s += stack.pop();
+                }
+                return s;
+            };
+
             const extractJSON = (text) => {
+                if (!text || typeof text !== 'string') return null;
+                
+                // 1. Markdown code blocks
+                const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+                if (codeBlockMatch) {
+                    try { return JSON.parse(cleanJsonString(codeBlockMatch[1].trim())); } catch (e) {}
+                }
+                
+                // 2. Direct parse
                 try {
-                    const match = text.match(/```(?:json)?\n([\s\S]*?)\n```/);
-                    if (match) return JSON.parse(match[1]);
-                    return JSON.parse(text);
-                } catch (e) { return null; }
+                    return JSON.parse(cleanJsonString(text.trim()));
+                } catch (e) {}
+                
+                // 3. Outermost { ... }
+                const firstBrace = text.indexOf('{');
+                const lastBrace = text.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace > firstBrace) {
+                    try {
+                        return JSON.parse(cleanJsonString(text.substring(firstBrace, lastBrace + 1)));
+                    } catch (e) {}
+                }
+                
+                // 4. Outermost [ ... ]
+                const firstBracket = text.indexOf('[');
+                const lastBracket = text.lastIndexOf(']');
+                if (firstBracket !== -1 && lastBracket > firstBracket) {
+                    try {
+                        return JSON.parse(cleanJsonString(text.substring(firstBracket, lastBracket + 1)));
+                    } catch (e) {}
+                }
+                
+                // 5. Auto repair for truncated outputs
+                try {
+                    const repaired = repairTruncatedJson(text);
+                    if (repaired) return JSON.parse(cleanJsonString(repaired));
+                } catch (e) {}
+
+                return null;
+            };
+
+            const normalizeDay = (d) => {
+                if (!d) return "Segunda";
+                const str = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (str.includes("seg")) return "Segunda";
+                if (str.includes("ter")) return "Terça";
+                if (str.includes("qua")) return "Quarta";
+                if (str.includes("qui")) return "Quinta";
+                if (str.includes("sex")) return "Sexta";
+                return "Segunda";
+            };
+
+            const normalizeHour = (h, horariosList) => {
+                if (!horariosList || horariosList.length === 0) return h || "";
+                if (horariosList.includes(h)) return h;
+                
+                const str = String(h).toLowerCase();
+                if (str.includes("1") || str.includes("primeir")) return horariosList[0] || "";
+                if (str.includes("2") || str.includes("segund")) return horariosList[1] || "";
+                if (str.includes("3") || str.includes("terceir")) return horariosList[2] || "";
+                if (str.includes("4") || str.includes("quart")) return horariosList[3] || "";
+                if (str.includes("5") || str.includes("quint")) return horariosList[4] || "";
+                if (str.includes("6") || str.includes("sext")) return horariosList[5] || "";
+                
+                for (let slot of horariosList) {
+                    if (slot.toLowerCase().includes(str) || str.includes(slot.toLowerCase())) return slot;
+                }
+                return horariosList[0] || "";
+            };
+
+            const convertAnyJsonToMaterias = (json, parsedHorarios) => {
+                if (!json) return null;
+                
+                // Schema A: por Matéria
+                let rawMaterias = null;
+                if (Array.isArray(json)) rawMaterias = json;
+                else if (Array.isArray(json.materias)) rawMaterias = json.materias;
+                else if (Array.isArray(json.disciplinas)) rawMaterias = json.disciplinas;
+                else if (json.data && Array.isArray(json.data.materias)) rawMaterias = json.data.materias;
+                else if (json.escola && Array.isArray(json.escola.materias)) rawMaterias = json.escola.materias;
+
+                if (rawMaterias && rawMaterias.length > 0 && typeof rawMaterias[0] === 'object') {
+                    return rawMaterias.map(m => {
+                        const rawProfs = Array.isArray(m.professores) ? m.professores : (Array.isArray(m.docentes) ? m.docentes : []);
+                        return {
+                            id: Date.now() + Math.random(),
+                            sigla: (m.sigla || m.nome || m.disciplina || "DISC").toUpperCase(),
+                            professores: rawProfs.map(p => {
+                                const rawTurmas = Array.isArray(p.turmas) ? p.turmas : (Array.isArray(p.classes) ? p.classes : []);
+                                const rawIndisp = Array.isArray(p.indisponibilidades) ? p.indisponibilidades : (Array.isArray(p.restricoes) ? p.restricoes : []);
+                                
+                                const processedIndisp = [];
+                                rawIndisp.forEach(ind => {
+                                    const diaStr = String(ind.dia || "").toLowerCase();
+                                    if (diaStr.includes("nenhum") || diaStr.includes("todo")) {
+                                        DIAS.forEach(d => processedIndisp.push({ id: Date.now() + Math.random(), dia: d, hora: normalizeHour(ind.hora, parsedHorarios) }));
+                                    } else {
+                                        processedIndisp.push({ id: Date.now() + Math.random(), dia: normalizeDay(ind.dia), hora: normalizeHour(ind.hora, parsedHorarios) });
+                                    }
+                                });
+
+                                return {
+                                    id: Date.now() + Math.random(),
+                                    nome: p.nome || p.professor || "Professor",
+                                    turmas: rawTurmas.map(t => ({
+                                        id: Date.now() + Math.random(),
+                                        nome: (t.nome || t.turma || "TURMA").toUpperCase(),
+                                        aulas: parseInt(t.aulas || t.quantidade || t.cargaHoraria || 1) || 1
+                                    })),
+                                    indisponibilidades: processedIndisp
+                                };
+                            })
+                        };
+                    });
+                }
+
+                // Schema B: por Professor
+                let rawProfs = Array.isArray(json.professores) ? json.professores : (Array.isArray(json.docentes) ? json.docentes : null);
+                if (rawProfs && rawProfs.length > 0) {
+                    const materiasMap = {};
+                    rawProfs.forEach(p => {
+                        const profName = p.nome || p.professor || "Professor";
+                        const rawIndisp = Array.isArray(p.indisponibilidades) ? p.indisponibilidades : (Array.isArray(p.restricoes) ? p.restricoes : []);
+                        const processedIndisp = [];
+                        rawIndisp.forEach(ind => {
+                            const diaStr = String(ind.dia || "").toLowerCase();
+                            if (diaStr.includes("nenhum") || diaStr.includes("todo")) {
+                                DIAS.forEach(d => processedIndisp.push({ id: Date.now() + Math.random(), dia: d, hora: normalizeHour(ind.hora, parsedHorarios) }));
+                            } else {
+                                processedIndisp.push({ id: Date.now() + Math.random(), dia: normalizeDay(ind.dia), hora: normalizeHour(ind.hora, parsedHorarios) });
+                            }
+                        });
+
+                        if (Array.isArray(p.materias)) {
+                            p.materias.forEach(m => {
+                                const sigla = (m.sigla || m.nome || m.disciplina || "DISC").toUpperCase();
+                                if (!materiasMap[sigla]) materiasMap[sigla] = { id: Date.now() + Math.random(), sigla, professores: [] };
+                                const rawTurmas = Array.isArray(m.turmas) ? m.turmas : (Array.isArray(p.turmas) ? p.turmas : []);
+                                materiasMap[sigla].professores.push({
+                                    id: Date.now() + Math.random(),
+                                    nome: profName,
+                                    turmas: rawTurmas.map(t => ({ id: Date.now() + Math.random(), nome: (t.nome || t.turma || "TURMA").toUpperCase(), aulas: parseInt(t.aulas || 1) })),
+                                    indisponibilidades: processedIndisp
+                                });
+                            });
+                        } else {
+                            const sigla = (p.materia || p.disciplina || "DISC").toUpperCase();
+                            if (!materiasMap[sigla]) materiasMap[sigla] = { id: Date.now() + Math.random(), sigla, professores: [] };
+                            const rawTurmas = Array.isArray(p.turmas) ? p.turmas : [];
+                            materiasMap[sigla].professores.push({
+                                id: Date.now() + Math.random(),
+                                nome: profName,
+                                turmas: rawTurmas.map(t => ({ id: Date.now() + Math.random(), nome: (t.nome || t.turma || "TURMA").toUpperCase(), aulas: parseInt(t.aulas || 1) })),
+                                indisponibilidades: processedIndisp
+                            });
+                        }
+                    });
+                    const res = Object.values(materiasMap);
+                    if (res.length > 0) return res;
+                }
+
+                // Schema C: por Turma
+                let rawTurmas = Array.isArray(json.turmas) ? json.turmas : (Array.isArray(json.classes) ? json.classes : null);
+                if (rawTurmas && rawTurmas.length > 0) {
+                    const materiasMap = {};
+                    rawTurmas.forEach(t => {
+                        const turmaName = (t.nome || t.turma || "TURMA").toUpperCase();
+                        const tMaterias = Array.isArray(t.materias) ? t.materias : (Array.isArray(t.disciplinas) ? t.disciplinas : []);
+                        tMaterias.forEach(m => {
+                            const sigla = (m.sigla || m.nome || m.disciplina || "DISC").toUpperCase();
+                            const profName = m.professor || m.docente || m.prof || "Professor";
+                            const aulas = parseInt(m.aulas || m.quantidade || m.cargaHoraria || 1) || 1;
+                            
+                            if (!materiasMap[sigla]) materiasMap[sigla] = { id: Date.now() + Math.random(), sigla, profsMap: {} };
+                            if (!materiasMap[sigla].profsMap[profName]) {
+                                materiasMap[sigla].profsMap[profName] = {
+                                    id: Date.now() + Math.random(),
+                                    nome: profName,
+                                    turmas: [],
+                                    indisponibilidades: []
+                                };
+                            }
+                            materiasMap[sigla].profsMap[profName].turmas.push({ id: Date.now() + Math.random(), nome: turmaName, aulas });
+                        });
+                    });
+
+                    const res = Object.values(materiasMap).map(m => ({
+                        id: m.id,
+                        sigla: m.sigla,
+                        professores: Object.values(m.profsMap)
+                    }));
+                    if (res.length > 0) return res;
+                }
+
+                return null;
+            };
+
+            const parseDirectText = (rawText) => {
+                if (!rawText || typeof rawText !== 'string') return null;
+                
+                const hasTurmaBlocks = /\b\d+[A-Za-z]+\s*:\s*\n/i.test(rawText);
+                const hasAssignPattern = /[A-Za-zÀ-ÖØ-öø-ÿ\s]+\s*\([^)]+\)\s*-\s*\d+/i.test(rawText);
+                
+                if (!hasTurmaBlocks || !hasAssignPattern) return null;
+
+                // 1. Extrair Horários
+                const horarioRegex = /(\d+)°[:\s]+(\d+h[^\n\r]*)/gi;
+                let match;
+                const horarios = [];
+                while ((match = horarioRegex.exec(rawText)) !== null) {
+                    let hText = match[2].trim();
+                    if (!hText.toLowerCase().includes("intervalo")) {
+                        horarios.push(hText);
+                    }
+                }
+                const finalHorarios = horarios.length > 0 ? horarios : ["7h - 7h45", "7h45 - 8h30", "8h50 - 9h35", "9h35 - 10h20", "10h20 - 11h05", "11h05 - 11h50"];
+
+                // 2. Extrair Indisponibilidades
+                const indispMap = {};
+                const restrSectionMatch = rawText.split(/restrições|restricoes/i);
+                if (restrSectionMatch.length > 1) {
+                    const restrText = restrSectionMatch[1];
+                    const profBlocks = restrText.split(/\n\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+):\s*\n/);
+                    
+                    for (let i = 1; i < profBlocks.length; i += 2) {
+                        const currentProf = profBlocks[i].trim();
+                        const rulesText = profBlocks[i+1];
+                        if (!indispMap[currentProf]) indispMap[currentProf] = [];
+                        
+                        const ruleLines = rulesText.split('\n');
+                        for (let line of ruleLines) {
+                            line = line.trim();
+                            if (!line) continue;
+                            const ruleMatch = line.match(/(\d+)°?\s*aula\s*-\s*(.+)/i);
+                            if (ruleMatch) {
+                                const aulaNum = parseInt(ruleMatch[1]);
+                                const horaSlot = finalHorarios[aulaNum - 1] || `${aulaNum}ª Aula`;
+                                const daysStr = ruleMatch[2].toLowerCase();
+                                
+                                if (daysStr.includes("nenhum") || daysStr.includes("todos")) {
+                                    DIAS.forEach(d => indispMap[currentProf].push({ dia: d, hora: horaSlot }));
+                                } else {
+                                    if (daysStr.includes("segunda")) indispMap[currentProf].push({ dia: "Segunda", hora: horaSlot });
+                                    if (daysStr.includes("terça") || daysStr.includes("terca")) indispMap[currentProf].push({ dia: "Terça", hora: horaSlot });
+                                    if (daysStr.includes("quarta")) indispMap[currentProf].push({ dia: "Quarta", hora: horaSlot });
+                                    if (daysStr.includes("quinta")) indispMap[currentProf].push({ dia: "Quinta", hora: horaSlot });
+                                    if (daysStr.includes("sexta")) indispMap[currentProf].push({ dia: "Sexta", hora: horaSlot });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Extrair Turmas e Aulas
+                const turmasSection = restrSectionMatch[0];
+                const turmasBlocks = turmasSection.split(/\n\s*(\d+[A-Za-z]+):\s*\n/);
+                const materiasMap = {};
+
+                for (let i = 1; i < turmasBlocks.length; i += 2) {
+                    const turmaName = turmasBlocks[i].trim().toUpperCase();
+                    const assignmentsText = turmasBlocks[i+1];
+                    
+                    const assignLines = assignmentsText.split('\n');
+                    for (let line of assignLines) {
+                        line = line.trim();
+                        if (!line) continue;
+                        const assignMatch = line.match(/([A-Za-zÀ-ÖØ-öø-ÿ\s]+)\s*\(([^)]+)\)\s*-\s*(\d+)/);
+                        if (assignMatch) {
+                            const profName = assignMatch[1].trim();
+                            const sigla = assignMatch[2].trim().toUpperCase();
+                            const aulas = parseInt(assignMatch[3]);
+                            
+                            if (!materiasMap[sigla]) materiasMap[sigla] = { id: Date.now() + Math.random(), sigla, profs: {} };
+                            if (!materiasMap[sigla].profs[profName]) {
+                                materiasMap[sigla].profs[profName] = {
+                                    id: Date.now() + Math.random(),
+                                    nome: profName,
+                                    turmas: [],
+                                    indisponibilidades: indispMap[profName] || []
+                                };
+                            }
+                            materiasMap[sigla].profs[profName].turmas.push({
+                                id: Date.now() + Math.random(),
+                                nome: turmaName,
+                                aulas: aulas
+                            });
+                        }
+                    }
+                }
+
+                const materiasList = Object.values(materiasMap).map(m => ({
+                    id: m.id,
+                    sigla: m.sigla,
+                    professores: Object.values(m.profs)
+                }));
+
+                if (materiasList.length === 0) return null;
+
+                return {
+                    numAulasDia: finalHorarios.length,
+                    horarios: finalHorarios,
+                    materias: materiasList
+                };
             };
 
             const handleGenerateFromData = async () => {
                 if (!aiText) return;
                 setAiLoading(true);
-                setAiStatus("Processando dados e formatando estruturas...");
+                setAiStatus("Analisando estruturas escolares...");
                 
-                const prompt = `Você é um parseador de dados estruturados. Converta o texto abaixo em um JSON exato, sem adicionar explicações.
-                
-                Estrutura exigida:
-                {
-                  "numAulasDia": numero (ex: 3),
-                  "horarios": ["8h", "10h"],
-                  "materias": [
-                    {
-                      "sigla": "Texto",
-                      "professores": [
-                        {
-                          "nome": "Texto",
-                          "turmas": [{ "nome": "1A", "aulas": 3 }],
-                          "indisponibilidades": [{ "dia": "Segunda", "hora": "8h" }]
-                        }
-                      ]
-                    }
-                  ]
+                // 1. Tenta primeiro o Parser Direto de Alta Precisão (Zero alucinações, sem duplicações)
+                const directParsed = parseDirectText(aiText);
+                if (directParsed && directParsed.materias.length > 0) {
+                    setNumAulasDia(directParsed.numAulasDia);
+                    setHorarios(directParsed.horarios);
+                    setMaterias(directParsed.materias);
+                    setStep(2);
+                    setIsAiInputOpen(false);
+                    setAiText("");
+                    setAiLoading(false);
+                    return;
                 }
-                
-                Entrada bruta:
-                "${aiText}"`;
+
+                // 2. Se for texto livre ou não padronizado, usa a IA da Cohere
+                setAiStatus("Processando via Inteligência Artificial (Cohere)...");
+                const prompt = `Você é um extrator de dados estruturados para um sistema escolar. Converta a entrada do usuário estritamente em um JSON.
+
+REGRAS OBRIGATÓRIAS:
+1. "numAulasDia": número total de aulas por dia (ignorar intervalos). Exemplo: 6.
+2. "horarios": lista de strings com os horários de aula (Ex: ["7h - 7h45", "7h45 - 8h30", "8h50 - 9h35", "9h35 - 10h20", "10h20 - 11h05", "11h05 - 11h50"]).
+3. "materias": lista de disciplinas. Para cada uma:
+   - "sigla": nome ou sigla da matéria (Ex: "Port", "Mat", "Hist", etc)
+   - "professores": lista de professores:
+     - "nome": nome do professor (Ex: "Juliana")
+     - "turmas": lista com turmas e quantidade de aulas semanais (Ex: [{"nome": "6A", "aulas": 5}, {"nome": "6B", "aulas": 5}])
+     - "indisponibilidades": lista de horários bloqueados. O campo "hora" DEVE corresponder ao horário da lista "horarios". O campo "dia" deve ser "Segunda", "Terça", "Quarta", "Quinta", "Sexta" ou "Todos os dias".
+
+ESTRUTURA JSON (Responda APENAS o JSON válido):
+{
+  "numAulasDia": 6,
+  "horarios": ["7h - 7h45", "7h45 - 8h30", "8h50 - 9h35", "9h35 - 10h20", "10h20 - 11h05", "11h05 - 11h50"],
+  "materias": [
+    {
+      "sigla": "Port",
+      "professores": [
+        {
+          "nome": "Juliana",
+          "turmas": [{ "nome": "6A", "aulas": 5 }],
+          "indisponibilidades": [{ "dia": "Segunda", "hora": "10h20 - 11h05" }]
+        }
+      ]
+    }
+  ]
+}
+
+Entrada do usuário:
+${aiText}`;
 
                 const aiResponseText = await callCohere(prompt);
                 if (aiResponseText) {
                     const json = extractJSON(aiResponseText);
-                    if (json && json.materias) {
-                        setNumAulasDia(json.numAulasDia || 3);
-                        setHorarios(json.horarios || ["8h", "10h", "14h"]);
-                        const processedMaterias = json.materias.map(m => ({
-                            id: Date.now() + Math.random(),
-                            sigla: m.sigla,
-                            professores: (m.professores || []).map(p => ({
-                                id: Date.now() + Math.random(),
-                                nome: p.nome,
-                                turmas: (p.turmas || []).map(t => ({ id: Date.now() + Math.random(), nome: t.nome, aulas: t.aulas })),
-                                indisponibilidades: (p.indisponibilidades || []).map(ind => ({ id: Date.now() + Math.random(), dia: ind.dia, hora: ind.hora }))
-                            }))
-                        }));
+                    
+                    let parsedNumAulas = 6;
+                    let parsedHorarios = [];
+                    if (json) {
+                        parsedNumAulas = parseInt(json.numAulasDia || json.aulasPorDia || (json.horarios ? json.horarios.length : 6)) || 6;
+                        parsedHorarios = Array.isArray(json.horarios) && json.horarios.length > 0 ? json.horarios : [];
+                    }
+                    
+                    if (parsedHorarios.length === 0) {
+                        parsedHorarios = Array.from({ length: parsedNumAulas }, (_, i) => `${i + 1}ª Aula`);
+                    } else if (parsedHorarios.length !== parsedNumAulas) {
+                        parsedNumAulas = parsedHorarios.length;
+                    }
+
+                    const processedMaterias = convertAnyJsonToMaterias(json, parsedHorarios);
+
+                    if (processedMaterias && processedMaterias.length > 0) {
+                        setNumAulasDia(parsedNumAulas);
+                        setHorarios(parsedHorarios);
                         setMaterias(processedMaterias);
                         setStep(2);
                         setIsAiInputOpen(false);
                         setAiText("");
                     } else {
-                        alert("Não foi possível mapear os dados corretamente. Verifique se o formato de entrada está legível.");
+                        alert("Não foi possível mapear os dados da resposta da IA. Verifique se o texto descreve as matérias e professores com clareza.");
                     }
                 }
                 setAiLoading(false);
@@ -482,9 +1020,35 @@
                                 </div>
                                 <h1 className="text-xl font-semibold tracking-wide text-gray-100">Grade Manager</h1>
                             </div>
-                            <button onClick={() => setIsAiConfigOpen(true)} className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors flex items-center bg-purple-900/10 px-3 py-1.5 rounded border border-purple-800/30">
-                                <i className="fa-solid fa-gear mr-2"></i> Configurações
-                            </button>
+                            
+                            <div className="flex items-center space-x-4">
+                                {apiLimits && (
+                                    <div className="flex items-center space-x-3 bg-[#181124] px-3.5 py-2 rounded-xl border border-purple-800/40 shadow-inner text-xs">
+                                        <div className="flex flex-col">
+                                            <div className="flex justify-between items-center text-[11px] mb-1 font-semibold">
+                                                <span className="text-gray-400">Quota Cohere</span>
+                                                <span className={`ml-2 font-bold ${apiLimits.percent > 40 ? 'text-purple-300' : (apiLimits.percent > 15 ? 'text-amber-400' : 'text-red-400')}`}>
+                                                    {apiLimits.percent}% ({apiLimits.remaining}/{apiLimits.limit})
+                                                </span>
+                                            </div>
+                                            <div className="w-32 sm:w-40 bg-[#0b0710] h-2 rounded-full overflow-hidden border border-purple-900/50 p-0.5">
+                                                <div 
+                                                    className={`h-full rounded-full transition-all duration-500 ${apiLimits.percent > 40 ? 'bg-gradient-to-r from-purple-500 to-fuchsia-400' : (apiLimits.percent > 15 ? 'bg-amber-400' : 'bg-red-500')}`}
+                                                    style={{ width: `${apiLimits.percent}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                        <div className="h-7 w-px bg-purple-900/40 hidden md:block"></div>
+                                        <div className="hidden md:flex flex-col text-right text-[11px]">
+                                            <span className="text-gray-500 font-medium">Uso Recente</span>
+                                            <span className="text-purple-200 font-bold">{apiLimits.tokensUsed} tokens</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <button onClick={() => setIsAiConfigOpen(true)} className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors flex items-center bg-purple-900/10 px-3 py-1.5 rounded border border-purple-800/30">
+                                    <i className="fa-solid fa-gear mr-2"></i> Configurações
+                                </button>
+                            </div>
                         </div>
 
                         {/* Modals */}
@@ -540,9 +1104,25 @@
                         <div className="p-6 sm:p-10">
                             
                             {(step === 1 || step === 2) && (
-                                <div className="flex justify-end mb-6">
-                                    <button onClick={() => setIsAiInputOpen(true)} className="text-sm bg-purple-900/20 text-purple-300 border border-purple-800/30 px-4 py-2 rounded-lg hover:bg-purple-800/40 transition-colors flex items-center">
-                                        <i className="fa-solid fa-cloud-arrow-down mr-2"></i> Importação Expressa
+                                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-[#160f22] p-3 rounded-xl border border-purple-900/30">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button onClick={salvarConfiguracao} className="text-xs font-semibold bg-[#181124] text-purple-300 border border-purple-800/40 px-3.5 py-2 rounded-lg hover:bg-[#251a35] transition-colors flex items-center shadow-sm">
+                                            <i className="fa-solid fa-floppy-disk mr-1.5 text-purple-400"></i> Salvar Recursos e Demandas
+                                        </button>
+                                        <button onClick={carregarConfiguracao} className="text-xs font-semibold bg-[#181124] text-purple-300 border border-purple-800/40 px-3.5 py-2 rounded-lg hover:bg-[#251a35] transition-colors flex items-center shadow-sm">
+                                            <i className="fa-solid fa-bolt mr-1.5 text-amber-400"></i> Carregar Dados Salvos
+                                        </button>
+                                        <button onClick={exportarConfiguracaoJSON} className="text-xs text-gray-400 hover:text-gray-200 px-3 py-2 rounded-lg transition-colors flex items-center border border-purple-900/20">
+                                            <i className="fa-solid fa-download mr-1.5"></i> Exportar JSON
+                                        </button>
+                                        <button onClick={() => jsonFileInputRef.current.click()} className="text-xs text-gray-400 hover:text-gray-200 px-3 py-2 rounded-lg transition-colors flex items-center border border-purple-900/20">
+                                            <i className="fa-solid fa-file-import mr-1.5"></i> Carregar JSON
+                                        </button>
+                                        <input type="file" accept=".json" ref={jsonFileInputRef} onChange={importarConfiguracaoJSON} className="hidden" />
+                                    </div>
+
+                                    <button onClick={() => setIsAiInputOpen(true)} className="text-xs font-semibold bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 transition-colors flex items-center shadow-md ml-auto">
+                                        <i className="fa-solid fa-wand-magic-sparkles mr-2"></i> Importação Expressa
                                     </button>
                                 </div>
                             )}
@@ -666,9 +1246,14 @@
 
                                     <div className="pt-8 flex justify-between items-center">
                                         <button onClick={() => setStep(1)} className="text-gray-400 hover:text-gray-200 text-sm px-4 py-2">Retornar</button>
-                                        <button onClick={gerarGrade} disabled={isGenerating} className={`text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${isGenerating ? 'bg-purple-900/50 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-500'}`}>
-                                            {isGenerating ? 'Compilando Grade...' : 'Compilar Grade Curricular'}
-                                        </button>
+                                        <div className="flex space-x-3">
+                                            <button onClick={salvarConfiguracao} className="text-purple-300 bg-[#1c1328] border border-purple-800/40 hover:bg-[#251a35] px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center shadow-sm">
+                                                <i className="fa-solid fa-floppy-disk mr-2 text-purple-400"></i> Salvar Demandas
+                                            </button>
+                                            <button onClick={gerarGrade} disabled={isGenerating} className={`text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${isGenerating ? 'bg-purple-900/50 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-500 shadow-lg'}`}>
+                                                {isGenerating ? 'Compilando Grade...' : 'Compilar Grade Curricular'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
