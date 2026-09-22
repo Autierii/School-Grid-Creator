@@ -86,7 +86,8 @@
                 const n = parseInt(val) || 1;
                 setNumAulasDia(n);
                 if (n > horarios.length) {
-                    setHorarios([...horarios, ...Array(n - horarios.length).fill("")]);
+                    const extra = Array.from({ length: n - horarios.length }, (_, i) => `${horarios.length + i + 1}ª Aula`);
+                    setHorarios([...horarios, ...extra]);
                 } else if (n < horarios.length) {
                     setHorarios(horarios.slice(0, n));
                 }
@@ -346,8 +347,8 @@
 
                 // Otimização Estocástica (Simulated Annealing + Min-Conflicts)
                 let solvedTimetable = null;
-                const NUM_RESTARTS = 80;
-                const ITERS_PER_RESTART = 5000;
+                const NUM_RESTARTS = 120;
+                const ITERS_PER_RESTART = 8000;
                 let lastYield = Date.now();
 
                 for (let restart = 0; restart < NUM_RESTARTS; restart++) {
@@ -368,7 +369,7 @@
                         break;
                     }
 
-                    let temp = 15.0;
+                    let temp = 20.0;
 
                     for (let iter = 0; iter < ITERS_PER_RESTART; iter++) {
                         if (Date.now() - lastYield > 20) {
@@ -413,7 +414,7 @@
                             currentTimetable[t][s1] = tempC;
                         }
 
-                        temp *= 0.9992;
+                        temp *= 0.9995;
                     }
 
                     if (solvedTimetable) break;

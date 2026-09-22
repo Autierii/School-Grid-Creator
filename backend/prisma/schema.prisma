@@ -1,0 +1,60 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  teachers  Teacher[]
+  subjects  Subject[]
+  classes   Class[]
+}
+
+model Teacher {
+  id        String   @id @default(uuid())
+  name      String
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  classes   TeacherClassSubject[]
+  restrictions String? 
+}
+
+model Subject {
+  id        String   @id @default(uuid())
+  name      String
+  sigla     String
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  classes   TeacherClassSubject[]
+}
+
+model Class {
+  id        String   @id @default(uuid())
+  name      String
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  teachers  TeacherClassSubject[]
+}
+
+model TeacherClassSubject {
+  id          String   @id @default(uuid())
+  teacherId   String
+  classId     String
+  subjectId   String
+  aulas       Int      @default(1)
+  
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+}
