@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import { resolverGrade } from './generator';
+import { processAiImport } from './ai';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -8,6 +11,8 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // --- SCHOOLS ---
 app.post('/api/schools', async (req, res) => {
@@ -169,6 +174,28 @@ app.post('/api/schools/:schoolId/generate', async (req, res) => {
     res.json({ grade: result });
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Failed to generate schedule' });
+  }
+});
+
+// --- AI IMPORT ---
+app.post('/api/schools/:schoolId/ai-import', upload.single('image'), async (req, res) => {
+  const { schoolId } = req.params;
+  const { provider, token, text } = req.body;
+
+  try {
+    const file = req.file;
+    await processAiImport(
+      schoolId, 
+      provider, 
+      token, 
+      text, 
+      file?.buffer, 
+      file?.mimetype
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("AI Import Error:", error);
+    res.status(400).json({ error: error.message || 'Falha ao processar com IA' });
   }
 });
 

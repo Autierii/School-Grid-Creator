@@ -22,8 +22,13 @@ function Sidebar() {
   );
 }
 
+import AiConfigModal from './components/AiConfigModal';
+import MagicImport from './components/MagicImport';
+
 function SchoolDashboard() {
   const { schoolId } = useParams();
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+
   return (
     <div className="flex">
       <div className="w-64 bg-[#130c1a] border-r border-[#3b2559] min-h-screen p-4 flex flex-col gap-4">
@@ -40,6 +45,13 @@ function SchoolDashboard() {
         <Link to={`/school/${schoolId}/classes`} className="flex items-center gap-2 text-gray-300 hover:text-white hover:bg-[#3b2559] p-2 rounded-lg transition-colors">
           <Layers /> Turmas
         </Link>
+        
+        <div className="mt-4 mb-4 border-t border-[#3b2559] pt-4"></div>
+        
+        <button onClick={() => setIsConfigOpen(true)} className="flex items-center gap-2 text-pink-300 hover:text-white hover:bg-pink-900/50 p-2 rounded-lg transition-colors">
+           Configurar IA
+        </button>
+        
         <Link to={`/school/${schoolId}/generate`} className="flex items-center gap-2 text-purple-300 hover:text-white hover:bg-purple-900 p-2 rounded-lg transition-colors mt-auto">
           <Calendar /> Gerar Grade
         </Link>
@@ -48,11 +60,12 @@ function SchoolDashboard() {
         <Routes>
           <Route path="teachers" element={<Teachers />} />
           <Route path="subjects" element={<Subjects />} />
-          <Route path="classes" element={<Classes />} />
+          <Route path="classes" element={<><MagicImport onImportComplete={() => window.location.reload()} /><Classes /></>} />
           <Route path="generate" element={<Generate />} />
           <Route path="" element={<div className="text-xl">Selecione uma opção no menu lateral para gerenciar sua escola.</div>} />
         </Routes>
       </div>
+      <AiConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
     </div>
   );
 }

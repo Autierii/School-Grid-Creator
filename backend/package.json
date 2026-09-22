@@ -13,14 +13,18 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "multer": "^2.4.0",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "^26.6.2",
     "nodemon": "^3.1.14",
     "prisma": "5.22.0",
