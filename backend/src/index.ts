@@ -123,8 +123,6 @@ app.delete('/api/lessons/:id', async (req, res) => {
   }
 });
 
-import { resolverGrade } from './generator';
-
 // --- GENERATE ---
 app.post('/api/schools/:schoolId/generate', async (req, res) => {
   const { schoolId } = req.params;
@@ -185,10 +183,10 @@ app.post('/api/schools/:schoolId/ai-import', upload.single('image'), async (req,
   try {
     const file = req.file;
     await processAiImport(
-      schoolId, 
-      provider, 
-      token, 
-      text, 
+      schoolId as string, 
+      provider as string, 
+      token as string, 
+      text as string, 
       file?.buffer, 
       file?.mimetype
     );
