@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useParams } from 'react-router-dom';
 import { Calendar, School, Users, BookOpen, Layers } from 'lucide-react';
 
+import Teachers from './pages/Teachers';
+import Subjects from './pages/Subjects';
+import Classes from './pages/Classes';
+import Generate from './pages/Generate';
+
 const API_URL = 'http://localhost:3001/api';
 
 function Sidebar() {
@@ -41,10 +46,10 @@ function SchoolDashboard() {
       </div>
       <div className="flex-1 p-8">
         <Routes>
-          <Route path="teachers" element={<div>Professores Management...</div>} />
-          <Route path="subjects" element={<div>Matérias Management...</div>} />
-          <Route path="classes" element={<div>Turmas Management...</div>} />
-          <Route path="generate" element={<div>Gerador de Grade...</div>} />
+          <Route path="teachers" element={<Teachers />} />
+          <Route path="subjects" element={<Subjects />} />
+          <Route path="classes" element={<Classes />} />
+          <Route path="generate" element={<Generate />} />
           <Route path="" element={<div className="text-xl">Selecione uma opção no menu lateral para gerenciar sua escola.</div>} />
         </Routes>
       </div>
