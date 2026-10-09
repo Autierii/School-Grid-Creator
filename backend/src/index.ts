@@ -28,7 +28,9 @@ const texto = (valor: unknown, campo: string) => {
 
 const restricoesJson = (valor: unknown) => {
   const lista = typeof valor === 'string' ? parseRestricoes(valor) : Array.isArray(valor) ? valor : [];
-  return JSON.stringify(lista.map((r: any) => ({ dia: String(r.dia), hora: String(r.hora).trim() })));
+  return JSON.stringify(lista
+    .filter((r: any) => r && typeof r.dia === 'string' && r.hora != null && String(r.hora).trim())
+    .map((r: any) => ({ dia: r.dia, hora: String(r.hora).trim() })));
 };
 
 const DEFAULT_HORARIOS = ["7h", "8h", "9h", "10h", "11h"];
