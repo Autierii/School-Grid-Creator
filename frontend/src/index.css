@@ -1,7 +1,49 @@
 @import "tailwindcss";
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0b0710;
-  color: #e2e8f0;
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f8fafc; /* slate-50 */
+    color: #0f172a; /* slate-900 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Impressão: só a grade aberta, uma turma/professor por página */
+@media print {
+  body > *:not(.print-root) { display: none !important; }
+  .print-root { position: static !important; background: white !important; backdrop-filter: none !important; }
+  .print-root > div { height: auto !important; background: white !important; }
+  .print-scroll { overflow: visible !important; padding: 0 !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .print-break { break-inside: avoid; page-break-after: always; box-shadow: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

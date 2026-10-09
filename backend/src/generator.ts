@@ -1,214 +1,289 @@
-const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+export const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 
-export const resolverGrade = async (materias: any[], horarios: string[]) => {
-  const turmasSet = new Set<string>();
-  let requirements: any[] = [];
-  let indispMap: Record<string, Set<string>> = {};
-  let requiredHoursCount = 0;
+export const VAGO = "—";
 
-  materias.forEach(mat => {
-      mat.professores.forEach((prof: any) => {
-          if (!indispMap[prof.nome]) indispMap[prof.nome] = new Set();
-          prof.indisponibilidades?.forEach((ind: any) => {
-              if(ind.dia && ind.hora) indispMap[prof.nome].add(`${ind.dia}-${ind.hora}`);
-          });
-          
-          prof.turmas.forEach((turma: any) => {
-              if (!turma.nome || parseInt(turma.aulas) <= 0) return;
-              turmasSet.add(turma.nome);
-              requirements.push({ mat: mat.sigla, prof: prof.nome, turma: turma.nome, total: parseInt(turma.aulas) });
-              requiredHoursCount += parseInt(turma.aulas);
-          });
-      });
-  });
+export interface Indisponibilidade { dia: string; hora: string }
+export interface TurmaReq { id: string; nome: string; aulas: number }
+export interface ProfessorReq { id: string; nome: string; indisponibilidades: Indisponibilidade[]; turmas: TurmaReq[] }
+export interface MateriaReq { id: string; sigla: string; professores: ProfessorReq[] }
 
-  const turmasList = Array.from(turmasSet);
-  const slotsPerTurma = DIAS.length * horarios.length;
-  const maxCapacity = turmasList.length * slotsPerTurma;
-  
-  if (requiredHoursCount > maxCapacity) {
-      throw new Error(`Capacidade excedida. Exigido: ${requiredHoursCount} aulas. Capacidade máxima: ${maxCapacity}.`);
+// grade[turma][dia][hora] = "SIGLA (Professor)" ou VAGO
+export type Grade = Record<string, Record<string, Record<string, string>>>;
+
+export interface ResultadoGrade {
+  grade: Grade;
+  completa: boolean;     // true = nenhum choque de professor nem horário bloqueado
+  conflitos: string[];   // problemas graves que sobraram na grade
+  avisos: string[];      // preferências não atendidas / dados suspeitos
+  tempoMs: number;
+}
+
+export interface OpcoesGerador {
+  tempoLimiteMs?: number;
+  maxAulasMesmaMateriaPorDia?: number;
+}
+
+const PESO_GRAVE = 100;   // choque de professor ou horário bloqueado
+const PESO_LEVE = 1;      // muitas aulas da mesma matéria no mesmo dia
+
+export class GradeImpossivelError extends Error {
+  constructor(public problemas: string[]) {
+    super(problemas.join("\n"));
   }
-  
-  for (let t of turmasList) {
-      const reqsTurma = requirements.filter(r => r.turma === t).reduce((sum, r) => sum + r.total, 0);
-      if (reqsTurma > slotsPerTurma) {
-          throw new Error(`Conflito: A turma ${t} exige ${reqsTurma} aulas, mas o quadro semanal possui apenas ${slotsPerTurma} horários disponíveis.`);
-      }
-  }
+}
 
-  // Cria instâncias individuais de cada aula
-  const classItems: any[] = [];
-  requirements.forEach((r) => {
-      for (let i = 0; i < r.total; i++) {
-          classItems.push({
-              id: classItems.length,
-              turma: r.turma,
-              prof: r.prof,
-              mat: r.mat
-          });
-      }
-  });
+/**
+ * Monta a grade semanal usando busca tabu orientada a conflitos.
+ *
+ * Cada turma tem uma linha de slots (dias x horários) contendo todas as suas aulas
+ * mais "vagos" para completar. Como só trocamos células dentro da mesma turma,
+ * a turma nunca tem duas aulas no mesmo horário; o algoritmo só precisa eliminar
+ * choques de professor e horários bloqueados.
+ */
+export async function resolverGrade(
+  materias: MateriaReq[],
+  horarios: string[],
+  opcoes: OpcoesGerador = {}
+): Promise<ResultadoGrade> {
+  const inicio = Date.now();
+  const tempoLimite = opcoes.tempoLimiteMs ?? 20000;
+  const maxPorDia = opcoes.maxAulasMesmaMateriaPorDia ?? 2;
 
-  // Cria coordenadas dos slots semanais
-  const allSlots: any[] = [];
-  DIAS.forEach(d => {
-      horarios.forEach(h => {
-          allSlots.push({ d, h });
-      });
-  });
+  if (horarios.length === 0) throw new GradeImpossivelError(["Informe pelo menos um horário de aula."]);
+  if (new Set(horarios).size !== horarios.length) throw new GradeImpossivelError(["Existem horários repetidos na lista de blocos de aula."]);
 
-  // Agrupa as aulas por turma e preenche com vago se necessário
-  const turmaClasses: Record<string, any[]> = {};
-  turmasList.forEach(t => {
-      const items = classItems.filter(c => c.turma === t);
-      while (items.length < slotsPerTurma) {
-          items.push({ id: -1, turma: t, prof: "", mat: "—" });
-      }
-      turmaClasses[t] = items;
-  });
+  const H = horarios.length;
+  const S = DIAS.length * H;
+  const slotIndex = new Map<string, number>();
+  DIAS.forEach((d, di) => horarios.forEach((h, hi) => slotIndex.set(`${d}|${h}`, di * H + hi)));
 
-  // Funções de avaliação de conflitos
-  function getSlotConflicts(timetable: any, sIdx: number) {
-      const slot = allSlots[sIdx];
-      let conf = 0;
-      const profsInSlot = new Set();
-      for (let t of turmasList) {
-          const c = timetable[t][sIdx];
-          if (c && c.id !== -1) {
-              if (profsInSlot.has(c.prof)) {
-                  conf += 20; // Penalidade choque de professor no mesmo horário
-              } else {
-                  profsInSlot.add(c.prof);
-              }
-              if (indispMap[c.prof] && indispMap[c.prof].has(`${slot.d}-${slot.h}`)) {
-                  conf += 20; // Penalidade professor alocado em horário bloqueado
-              }
-          }
-      }
-      return conf;
-  }
+  // --- Indexa turmas, professores e pares turma/matéria ---
+  const turmas: { id: string; nome: string }[] = [];
+  const turmaIdx = new Map<string, number>();
+  const profs: { id: string; nome: string; indisp: boolean[]; carga: number }[] = [];
+  const profIdx = new Map<string, number>();
+  const pares = new Map<string, number>();
+  const aulas: { turma: number; prof: number; par: number; sigla: string }[] = [];
+  const avisos: string[] = [];
 
-  function getTurmaDayConflicts(timetable: any, t: string, dIdx: number) {
-      const subjectCounts: Record<string, number> = {};
-      let conf = 0;
-      for (let hIdx = 0; hIdx < horarios.length; hIdx++) {
-          const sIdx = dIdx * horarios.length + hIdx;
-          const c = timetable[t][sIdx];
-          if (c && c.id !== -1) {
-              subjectCounts[c.mat] = (subjectCounts[c.mat] || 0) + 1;
-              if (subjectCounts[c.mat] > 2) {
-                  conf += 2; // Penalidade mais de 2 aulas da mesma matéria no mesmo dia
-              }
-          }
-      }
-      return conf;
-  }
-
-  function countTotalConflicts(timetable: any) {
-      let total = 0;
-      for (let s = 0; s < slotsPerTurma; s++) {
-          total += getSlotConflicts(timetable, s);
-      }
-      for (let t of turmasList) {
-          for (let d = 0; d < DIAS.length; d++) {
-              total += getTurmaDayConflicts(timetable, t, d);
-          }
-      }
-      return total;
-  }
-
-  // Otimização Estocástica (Simulated Annealing + Min-Conflicts)
-  let solvedTimetable: any = null;
-  const NUM_RESTARTS = 120;
-  const ITERS_PER_RESTART = 8000;
-  let lastYield = Date.now();
-
-  for (let restart = 0; restart < NUM_RESTARTS; restart++) {
-      let currentTimetable: any = {};
-      turmasList.forEach(t => {
-          const items = [...turmaClasses[t]];
-          // Embaralha slots da turma
-          for (let i = items.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [items[i], items[j]] = [items[j], items[i]];
-          }
-          currentTimetable[t] = items;
-      });
-
-      let currentConflicts = countTotalConflicts(currentTimetable);
-      if (currentConflicts === 0) {
-          solvedTimetable = currentTimetable;
-          break;
-      }
-
-      let temp = 20.0;
-
-      for (let iter = 0; iter < ITERS_PER_RESTART; iter++) {
-          if (Date.now() - lastYield > 20) {
-              await new Promise(r => setTimeout(r, 0));
-              lastYield = Date.now();
-          }
-
-          const t = turmasList[Math.floor(Math.random() * turmasList.length)];
-          const s1 = Math.floor(Math.random() * slotsPerTurma);
-          const s2 = Math.floor(Math.random() * slotsPerTurma);
-          if (s1 === s2) continue;
-
-          const d1 = Math.floor(s1 / horarios.length);
-          const d2 = Math.floor(s2 / horarios.length);
-
-          const oldConf = getSlotConflicts(currentTimetable, s1) + 
-                         getSlotConflicts(currentTimetable, s2) + 
-                         getTurmaDayConflicts(currentTimetable, t, d1) + 
-                         (d1 !== d2 ? getTurmaDayConflicts(currentTimetable, t, d2) : 0);
-
-          // Troca de posição
-          const tempC = currentTimetable[t][s1];
-          currentTimetable[t][s1] = currentTimetable[t][s2];
-          currentTimetable[t][s2] = tempC;
-
-          const newConf = getSlotConflicts(currentTimetable, s1) + 
-                         getSlotConflicts(currentTimetable, s2) + 
-                         getTurmaDayConflicts(currentTimetable, t, d1) + 
-                         (d1 !== d2 ? getTurmaDayConflicts(currentTimetable, t, d2) : 0);
-
-          const delta = newConf - oldConf;
-
-          if (delta <= 0 || Math.random() < Math.exp(-delta / temp)) {
-              currentConflicts += delta;
-              if (currentConflicts === 0) {
-                  solvedTimetable = currentTimetable;
-                  break;
-              }
+  for (const mat of materias) {
+    for (const prof of mat.professores) {
+      let p = profIdx.get(prof.id);
+      if (p === undefined) {
+        p = profs.length;
+        profIdx.set(prof.id, p);
+        profs.push({ id: prof.id, nome: prof.nome, indisp: new Array(S).fill(false), carga: 0 });
+        for (const ind of prof.indisponibilidades ?? []) {
+          const s = slotIndex.get(`${ind?.dia}|${String(ind?.hora ?? "").trim()}`);
+          if (s === undefined) {
+            avisos.push(`Restrição de ${prof.nome} (${ind?.dia} ${ind?.hora}) não corresponde a nenhum horário configurado e foi ignorada.`);
           } else {
-              // Reverte a troca
-              currentTimetable[t][s2] = currentTimetable[t][s1];
-              currentTimetable[t][s1] = tempC;
+            profs[p].indisp[s] = true;
           }
-
-          temp *= 0.9995;
+        }
       }
 
-      if (solvedTimetable) break;
+      for (const turma of prof.turmas) {
+        const qtd = Math.floor(Number(turma.aulas));
+        if (!turma.nome || !(qtd > 0)) continue;
+        let t = turmaIdx.get(turma.id);
+        if (t === undefined) {
+          t = turmas.length;
+          turmaIdx.set(turma.id, t);
+          turmas.push({ id: turma.id, nome: turma.nome });
+        }
+        const chavePar = `${t}|${mat.id}`;
+        let par = pares.get(chavePar);
+        if (par === undefined) { par = pares.size; pares.set(chavePar, par); }
+        for (let i = 0; i < qtd; i++) aulas.push({ turma: t, prof: p, par, sigla: mat.sigla });
+        profs[p].carga += qtd;
+      }
+    }
   }
 
-  if (!solvedTimetable) {
-      throw new Error("Não foi possível fechar uma grade com 0 choques com essas restrições. Verifique se os bloqueios de professores deixam horários livres suficientes.");
+  if (turmas.length === 0) {
+    throw new GradeImpossivelError(["Nenhuma aula cadastrada. Atribua professores e disciplinas às turmas antes de gerar a grade."]);
   }
 
-  let newGrade: any = {};
-  turmasList.forEach(t => {
-      newGrade[t] = {};
-      DIAS.forEach((d, dIdx) => {
-          newGrade[t][d] = {};
-          horarios.forEach((h, hIdx) => {
-              const sIdx = dIdx * horarios.length + hIdx;
-              const c = solvedTimetable[t][sIdx];
-              newGrade[t][d][h] = (c && c.id !== -1 && c.mat !== "—") ? `${c.mat} (${c.prof})` : "—";
-          });
+  // --- Verificador de viabilidade ---
+  const problemas: string[] = [];
+  const cargaTurma = new Array(turmas.length).fill(0);
+  aulas.forEach(a => cargaTurma[a.turma]++);
+  turmas.forEach((t, i) => {
+    if (cargaTurma[i] > S) problemas.push(`A turma ${t.nome} tem ${cargaTurma[i]} aulas, mas a semana só tem ${S} horários.`);
+  });
+  profs.forEach(p => {
+    const livres = p.indisp.filter(x => !x).length;
+    if (p.carga > livres) problemas.push(`${p.nome} precisa dar ${p.carga} aulas, mas só tem ${livres} horários disponíveis na semana.`);
+  });
+  if (problemas.length > 0) throw new GradeImpossivelError(problemas);
+
+  // --- Estado da busca ---
+  const T = turmas.length;
+  const P = profs.length;
+  const D = DIAS.length;
+  const grid: Int32Array[] = turmas.map(() => new Int32Array(S).fill(-1)); // índice da aula ou -1 (vago)
+  const ocupacaoProf = new Int32Array(P * S);
+  const parDia = new Int32Array(pares.size * D);
+  let custo = 0;
+
+  const custoProfSlot = (p: number, s: number) => {
+    const n = ocupacaoProf[p * S + s];
+    return (n > 1 ? n - 1 : 0) + (profs[p].indisp[s] ? n : 0);
+  };
+  const custoParDia = (par: number, d: number) => Math.max(0, parDia[par * D + d] - maxPorDia);
+
+  // Retorna a variação de custo ao adicionar (+1) ou remover (-1) a aula `a` do slot `s`.
+  const mover = (a: number, s: number, sinal: 1 | -1) => {
+    const { prof, par } = aulas[a];
+    const d = Math.floor(s / H);
+    const antes = PESO_GRAVE * custoProfSlot(prof, s) + PESO_LEVE * custoParDia(par, d);
+    ocupacaoProf[prof * S + s] += sinal;
+    parDia[par * D + d] += sinal;
+    const depois = PESO_GRAVE * custoProfSlot(prof, s) + PESO_LEVE * custoParDia(par, d);
+    return depois - antes;
+  };
+
+  const trocar = (t: number, s1: number, s2: number) => {
+    const a = grid[t][s1], b = grid[t][s2];
+    let delta = 0;
+    if (a >= 0) delta += mover(a, s1, -1);
+    if (b >= 0) delta += mover(b, s2, -1);
+    if (a >= 0) delta += mover(a, s2, 1);
+    if (b >= 0) delta += mover(b, s1, 1);
+    grid[t][s1] = b;
+    grid[t][s2] = a;
+    return delta;
+  };
+
+  // --- Solução inicial gulosa: aulas de professores mais "apertados" primeiro ---
+  const folga = profs.map(p => p.indisp.filter(x => !x).length - p.carga);
+  const ordem = aulas.map((_, i) => i).sort((x, y) => folga[aulas[x].prof] - folga[aulas[y].prof] || Math.random() - 0.5);
+  for (const a of ordem) {
+    const { turma, prof, par } = aulas[a];
+    let melhor = -1, melhorCusto = Infinity;
+    for (let s = 0; s < S; s++) {
+      if (grid[turma][s] !== -1) continue;
+      const c = PESO_GRAVE * ((ocupacaoProf[prof * S + s] > 0 ? 1 : 0) + (profs[prof].indisp[s] ? 1 : 0))
+        + PESO_LEVE * (parDia[par * D + Math.floor(s / H)] >= maxPorDia ? 1 : 0)
+        + Math.random() * 0.5;
+      if (c < melhorCusto) { melhorCusto = c; melhor = s; }
+    }
+    grid[turma][melhor] = a;
+    custo += mover(a, melhor, 1);
+  }
+
+  // --- Busca tabu ---
+  const tabu = new Int32Array(aulas.length * S); // iteração até a qual a aula não pode voltar ao slot
+  let melhorCusto = custo;
+  let melhorGrid = grid.map(r => r.slice());
+  let semMelhora = 0;
+  let ultimaPausa = Date.now();
+
+  const celulaConflitante = (t: number, s: number) => {
+    const a = grid[t][s];
+    if (a < 0) return 0;
+    const { prof, par } = aulas[a];
+    const grave = ocupacaoProf[prof * S + s] > 1 || profs[prof].indisp[s];
+    if (grave) return 2;
+    return parDia[par * D + Math.floor(s / H)] > maxPorDia ? 1 : 0;
+  };
+
+  for (let iter = 1; custo > 0 && Date.now() - inicio < tempoLimite; iter++) {
+    if (Date.now() - ultimaPausa > 50) {
+      await new Promise(r => setImmediate(r)); // não trava o servidor
+      ultimaPausa = Date.now();
+    }
+
+    // Escolhe uma célula em conflito (priorizando conflitos graves)
+    const graves: number[] = [], leves: number[] = [];
+    for (let t = 0; t < T; t++) {
+      for (let s = 0; s < S; s++) {
+        const c = celulaConflitante(t, s);
+        if (c === 2) graves.push(t * S + s);
+        else if (c === 1) leves.push(t * S + s);
+      }
+    }
+    const lista = graves.length > 0 ? graves : leves;
+    const escolhida = lista[Math.floor(Math.random() * lista.length)];
+    const t = Math.floor(escolhida / S), s1 = escolhida % S;
+
+    // Avalia todas as trocas dentro da turma e aplica a melhor não-tabu
+    let melhorDelta = Infinity, melhorS2 = -1, empates = 0;
+    for (let s2 = 0; s2 < S; s2++) {
+      if (s2 === s1) continue;
+      const a = grid[t][s1], b = grid[t][s2];
+      if (a < 0 && b < 0) continue;
+      const delta = trocar(t, s1, s2);
+      trocar(t, s1, s2); // desfaz
+      const ehTabu = (a >= 0 && tabu[a * S + s2] > iter) || (b >= 0 && tabu[b * S + s1] > iter);
+      if (ehTabu && custo + delta >= melhorCusto) continue; // critério de aspiração
+      if (delta < melhorDelta) { melhorDelta = delta; melhorS2 = s2; empates = 1; }
+      else if (delta === melhorDelta && Math.random() * ++empates < 1) melhorS2 = s2;
+    }
+    if (melhorS2 < 0) continue;
+
+    const a = grid[t][s1], b = grid[t][melhorS2];
+    custo += trocar(t, s1, melhorS2);
+    const permanencia = 7 + Math.floor(Math.random() * 10);
+    if (a >= 0) tabu[a * S + s1] = iter + permanencia;
+    if (b >= 0) tabu[b * S + melhorS2] = iter + permanencia;
+
+    if (custo < melhorCusto) {
+      melhorCusto = custo;
+      melhorGrid = grid.map(r => r.slice());
+      semMelhora = 0;
+    } else if (++semMelhora > 3000) {
+      // Estagnou: volta à melhor solução e embaralha um pouco
+      for (let tt = 0; tt < T; tt++) {
+        for (let s = 0; s < S; s++) {
+          if (grid[tt][s] >= 0) mover(grid[tt][s], s, -1);
+          grid[tt][s] = melhorGrid[tt][s];
+          if (grid[tt][s] >= 0) mover(grid[tt][s], s, 1);
+        }
+      }
+      custo = melhorCusto;
+      for (let k = 0; k < T * 2; k++) {
+        const tt = Math.floor(Math.random() * T);
+        custo += trocar(tt, Math.floor(Math.random() * S), Math.floor(Math.random() * S));
+      }
+      tabu.fill(0);
+      semMelhora = 0;
+    }
+  }
+
+  // --- Monta o resultado a partir da melhor solução encontrada ---
+  const conflitos: string[] = [];
+  const grade: Grade = {};
+  const profNoSlot = new Map<string, string[]>();
+
+  turmas.forEach((turma, t) => {
+    grade[turma.nome] = {};
+    DIAS.forEach((dia, d) => {
+      grade[turma.nome][dia] = {};
+      const contagem = new Map<string, number>();
+      horarios.forEach((hora, h) => {
+        const a = melhorGrid[t][d * H + h];
+        if (a < 0) { grade[turma.nome][dia][hora] = VAGO; return; }
+        const aula = aulas[a];
+        const prof = profs[aula.prof];
+        grade[turma.nome][dia][hora] = `${aula.sigla} (${prof.nome})`;
+
+        const chave = `${aula.prof}|${d * H + h}`;
+        profNoSlot.set(chave, [...(profNoSlot.get(chave) ?? []), turma.nome]);
+        if (prof.indisp[d * H + h]) conflitos.push(`${prof.nome} está bloqueado(a) em ${dia} ${hora}, mas ficou com aula na turma ${turma.nome}.`);
+        contagem.set(aula.sigla, (contagem.get(aula.sigla) ?? 0) + 1);
       });
+      contagem.forEach((n, sigla) => {
+        if (n > maxPorDia) avisos.push(`Turma ${turma.nome} tem ${n} aulas de ${sigla} na ${dia}.`);
+      });
+    });
+  });
+  profNoSlot.forEach((ts, chave) => {
+    if (ts.length < 2) return;
+    const [p, s] = chave.split("|").map(Number);
+    conflitos.push(`${profs[p].nome} ficou em ${ts.length} turmas ao mesmo tempo (${ts.join(", ")}) em ${DIAS[Math.floor(s / H)]} ${horarios[s % H]}.`);
   });
 
-  return newGrade;
-};
+  return { grade, completa: conflitos.length === 0, conflitos, avisos, tempoMs: Date.now() - inicio };
+}

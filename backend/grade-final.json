@@ -1,0 +1,338 @@
+{
+  "6A": {
+    "Segunda": {
+      "7h - 7h45min": "Mat (Dani)",
+      "7h45min - 8h30min": "Port (Juliana)",
+      "8h50min - 9:35h": "Port (Juliana)",
+      "9h35min - 10h20min": "Art (Juliana S)",
+      "10h20min - 11h05min": "Ing (Elisangela)",
+      "11h05min - 11h50min": "Cie (Aparecida)"
+    },
+    "Terça": {
+      "7h - 7h45min": "EF (Rafael)",
+      "7h45min - 8h30min": "Geo (Ana Paula)",
+      "8h50min - 9:35h": "Lei (Raimundo)",
+      "9h35min - 10h20min": "Inf (Marcos)",
+      "10h20min - 11h05min": "Mat (Dani)",
+      "11h05min - 11h50min": "Ing (Elisangela)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Hist (Mikhail)",
+      "7h45min - 8h30min": "Port (Juliana)",
+      "8h50min - 9:35h": "Mat (Dani)",
+      "9h35min - 10h20min": "EF (Rafael)",
+      "10h20min - 11h05min": "Cie (Aparecida)",
+      "11h05min - 11h50min": "Port (Juliana)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Hist (Mikhail)",
+      "7h45min - 8h30min": "Mat (Dani)",
+      "8h50min - 9:35h": "Geo (Ana Paula)",
+      "9h35min - 10h20min": "Cie (Aparecida)",
+      "10h20min - 11h05min": "EF (Rafael)",
+      "11h05min - 11h50min": "Hist (Mikhail)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Mat (Dani)",
+      "7h45min - 8h30min": "Art (Juliana S)",
+      "8h50min - 9:35h": "Cie (Aparecida)",
+      "9h35min - 10h20min": "Geo (Ana Paula)",
+      "10h20min - 11h05min": "Port (Juliana)",
+      "11h05min - 11h50min": "Hist (Mikhail)"
+    }
+  },
+  "6B": {
+    "Segunda": {
+      "7h - 7h45min": "Inf (Marcos)",
+      "7h45min - 8h30min": "Lei (Raimundo)",
+      "8h50min - 9:35h": "Mat (Dani)",
+      "9h35min - 10h20min": "Port (Juliana)",
+      "10h20min - 11h05min": "Cie (Aparecida)",
+      "11h05min - 11h50min": "Ing (Elisangela)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Cie (Aparecida)",
+      "7h45min - 8h30min": "Mat (Dani)",
+      "8h50min - 9:35h": "Mat (Dani)",
+      "9h35min - 10h20min": "EF (Rafael)",
+      "10h20min - 11h05min": "Hist (Cida)",
+      "11h05min - 11h50min": "Hist (Cida)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Geo (Ana Paula)",
+      "7h45min - 8h30min": "Cie (Aparecida)",
+      "8h50min - 9:35h": "Cie (Aparecida)",
+      "9h35min - 10h20min": "Mat (Dani)",
+      "10h20min - 11h05min": "Ing (Elisangela)",
+      "11h05min - 11h50min": "Hist (Cida)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Art (Juliana S)",
+      "7h45min - 8h30min": "Port (Juliana)",
+      "8h50min - 9:35h": "Port (Juliana)",
+      "9h35min - 10h20min": "Geo (Ana Paula)",
+      "10h20min - 11h05min": "Art (Juliana S)",
+      "11h05min - 11h50min": "EF (Rafael)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Geo (Ana Paula)",
+      "7h45min - 8h30min": "EF (Rafael)",
+      "8h50min - 9:35h": "Mat (Dani)",
+      "9h35min - 10h20min": "Port (Juliana)",
+      "10h20min - 11h05min": "Hist (Cida)",
+      "11h05min - 11h50min": "Port (Juliana)"
+    }
+  },
+  "8A": {
+    "Segunda": {
+      "7h - 7h45min": "Art (Juliana S)",
+      "7h45min - 8h30min": "Inf (Marcos)",
+      "8h50min - 9:35h": "Cie (Aline)",
+      "9h35min - 10h20min": "Hist (Mikhail)",
+      "10h20min - 11h05min": "Art (Juliana S)",
+      "11h05min - 11h50min": "Mat (Eliane)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Port (Juliana)",
+      "7h45min - 8h30min": "Port (Juliana)",
+      "8h50min - 9:35h": "Cie (Aline)",
+      "9h35min - 10h20min": "Lei (Raimundo)",
+      "10h20min - 11h05min": "Geo (Ana Paula)",
+      "11h05min - 11h50min": "Mat (Eliane)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Ing (Andreia)",
+      "7h45min - 8h30min": "Mat (Eliane)",
+      "8h50min - 9:35h": "Hist (Mikhail)",
+      "9h35min - 10h20min": "Port (Juliana)",
+      "10h20min - 11h05min": "EF (Rafael)",
+      "11h05min - 11h50min": "Hist (Mikhail)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Geo (Ana Paula)",
+      "7h45min - 8h30min": "Cie (Aline)",
+      "8h50min - 9:35h": "Mat (Eliane)",
+      "9h35min - 10h20min": "Port (Juliana)",
+      "10h20min - 11h05min": "Mat (Eliane)",
+      "11h05min - 11h50min": "Geo (Ana Paula)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Port (Juliana)",
+      "7h45min - 8h30min": "Cie (Aline)",
+      "8h50min - 9:35h": "Geo (Ana Paula)",
+      "9h35min - 10h20min": "EF (Rafael)",
+      "10h20min - 11h05min": "Ing (Andreia)",
+      "11h05min - 11h50min": "EF (Rafael)"
+    }
+  },
+  "9A": {
+    "Segunda": {
+      "7h - 7h45min": "EF (Rafael)",
+      "7h45min - 8h30min": "Cie (Aline)",
+      "8h50min - 9:35h": "Hist (Mikhail)",
+      "9h35min - 10h20min": "Geo (Ana Paula)",
+      "10h20min - 11h05min": "Hist (Mikhail)",
+      "11h05min - 11h50min": "Mat (Dan)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Lei (Raimundo)",
+      "7h45min - 8h30min": "Inf (Marcos)",
+      "8h50min - 9:35h": "Geo (Ana Paula)",
+      "9h35min - 10h20min": "Port (Juliana)",
+      "10h20min - 11h05min": "Hist (Mikhail)",
+      "11h05min - 11h50min": "Mat (Dan)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Mat (Dan)",
+      "7h45min - 8h30min": "Ing (Andreia)",
+      "8h50min - 9:35h": "Port (Juliana)",
+      "9h35min - 10h20min": "Geo (Ana Paula)",
+      "10h20min - 11h05min": "Cie (Aline)",
+      "11h05min - 11h50min": "Mat (Dan)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Port (Juliana)",
+      "7h45min - 8h30min": "Art (Juliana S)",
+      "8h50min - 9:35h": "Ing (Andreia)",
+      "9h35min - 10h20min": "Cie (Aline)",
+      "10h20min - 11h05min": "Geo (Ana Paula)",
+      "11h05min - 11h50min": "Port (Juliana)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "EF (Rafael)",
+      "7h45min - 8h30min": "Mat (Dan)",
+      "8h50min - 9:35h": "Port (Juliana)",
+      "9h35min - 10h20min": "Art (Juliana S)",
+      "10h20min - 11h05min": "EF (Rafael)",
+      "11h05min - 11h50min": "Cie (Aline)"
+    }
+  },
+  "9B": {
+    "Segunda": {
+      "7h - 7h45min": "Ing (Andreia)",
+      "7h45min - 8h30min": "Art (Juliana S)",
+      "8h50min - 9:35h": "Lei (Raimundo)",
+      "9h35min - 10h20min": "EF (Rafael)",
+      "10h20min - 11h05min": "Geo (Robson)",
+      "11h05min - 11h50min": "Hist (Mikhail)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Inf (Marcos)",
+      "7h45min - 8h30min": "Geo (Robson)",
+      "8h50min - 9:35h": "Port (Juliana)",
+      "9h35min - 10h20min": "Mat (Dani)",
+      "10h20min - 11h05min": "Geo (Robson)",
+      "11h05min - 11h50min": "Mat (Dani)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Port (Juliana)",
+      "7h45min - 8h30min": "Cie (Aline)",
+      "8h50min - 9:35h": "Geo (Robson)",
+      "9h35min - 10h20min": "Ing (Andreia)",
+      "10h20min - 11h05min": "Port (Juliana)",
+      "11h05min - 11h50min": "Cie (Aline)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Cie (Aline)",
+      "7h45min - 8h30min": "EF (Rafael)",
+      "8h50min - 9:35h": "Mat (Dani)",
+      "9h35min - 10h20min": "Hist (Mikhail)",
+      "10h20min - 11h05min": "Port (Juliana)",
+      "11h05min - 11h50min": "Mat (Dani)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Art (Juliana S)",
+      "7h45min - 8h30min": "Port (Juliana)",
+      "8h50min - 9:35h": "EF (Rafael)",
+      "9h35min - 10h20min": "Cie (Aline)",
+      "10h20min - 11h05min": "Hist (Mikhail)",
+      "11h05min - 11h50min": "Mat (Dani)"
+    }
+  },
+  "7A": {
+    "Segunda": {
+      "7h - 7h45min": "Lei (Raimundo)",
+      "7h45min - 8h30min": "Mat (Dani)",
+      "8h50min - 9:35h": "Inf (Marcos)",
+      "9h35min - 10h20min": "Port (Denise)",
+      "10h20min - 11h05min": "Geo (Ana Paula)",
+      "11h05min - 11h50min": "Ing (Andreia)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Cie (Aline)",
+      "7h45min - 8h30min": "EF (Rafael)",
+      "8h50min - 9:35h": "EF (Rafael)",
+      "9h35min - 10h20min": "Geo (Ana Paula)",
+      "10h20min - 11h05min": "Ing (Andreia)",
+      "11h05min - 11h50min": "Cie (Aline)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Mat (Dani)",
+      "7h45min - 8h30min": "Mat (Dani)",
+      "8h50min - 9:35h": "Cie (Aline)",
+      "9h35min - 10h20min": "Hist (Mikhail)",
+      "10h20min - 11h05min": "Hist (Mikhail)",
+      "11h05min - 11h50min": "Port (Denise)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Mat (Dani)",
+      "7h45min - 8h30min": "Geo (Ana Paula)",
+      "8h50min - 9:35h": "EF (Rafael)",
+      "9h35min - 10h20min": "Mat (Dani)",
+      "10h20min - 11h05min": "Cie (Aline)",
+      "11h05min - 11h50min": "Port (Denise)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Hist (Mikhail)",
+      "7h45min - 8h30min": "Hist (Mikhail)",
+      "8h50min - 9:35h": "Art (Juliana S)",
+      "9h35min - 10h20min": "Port (Denise)",
+      "10h20min - 11h05min": "Port (Denise)",
+      "11h05min - 11h50min": "Art (Juliana S)"
+    }
+  },
+  "7B": {
+    "Segunda": {
+      "7h - 7h45min": "Hist (Mikhail)",
+      "7h45min - 8h30min": "Geo (Ana Paula)",
+      "8h50min - 9:35h": "Art (Juliana S)",
+      "9h35min - 10h20min": "Inf (Marcos)",
+      "10h20min - 11h05min": "Mat (Eliane)",
+      "11h05min - 11h50min": "Cie (Aline)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Ing (Andreia)",
+      "7h45min - 8h30min": "Lei (Raimundo)",
+      "8h50min - 9:35h": "Hist (Mikhail)",
+      "9h35min - 10h20min": "Port (Denise)",
+      "10h20min - 11h05min": "Mat (Eliane)",
+      "11h05min - 11h50min": "Geo (Ana Paula)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "EF (Rafael)",
+      "7h45min - 8h30min": "EF (Rafael)",
+      "8h50min - 9:35h": "Mat (Eliane)",
+      "9h35min - 10h20min": "Mat (Eliane)",
+      "10h20min - 11h05min": "Ing (Andreia)",
+      "11h05min - 11h50min": "Geo (Ana Paula)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "EF (Rafael)",
+      "7h45min - 8h30min": "Hist (Mikhail)",
+      "8h50min - 9:35h": "Cie (Aline)",
+      "9h35min - 10h20min": "Art (Juliana S)",
+      "10h20min - 11h05min": "Port (Denise)",
+      "11h05min - 11h50min": "Mat (Eliane)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Cie (Aline)",
+      "7h45min - 8h30min": "Port (Denise)",
+      "8h50min - 9:35h": "Port (Denise)",
+      "9h35min - 10h20min": "Hist (Mikhail)",
+      "10h20min - 11h05min": "Cie (Aline)",
+      "11h05min - 11h50min": "Port (Denise)"
+    }
+  },
+  "8B": {
+    "Segunda": {
+      "7h - 7h45min": "Mat (Eliane)",
+      "7h45min - 8h30min": "EF (Rafael)",
+      "8h50min - 9:35h": "EF (Rafael)",
+      "9h35min - 10h20min": "Lei (Raimundo)",
+      "10h20min - 11h05min": "Cie (Aline)",
+      "11h05min - 11h50min": "Geo (Ana Paula)"
+    },
+    "Terça": {
+      "7h - 7h45min": "Geo (Ana Paula)",
+      "7h45min - 8h30min": "Cie (Aline)",
+      "8h50min - 9:35h": "Inf (Marcos)",
+      "9h35min - 10h20min": "Hist (Mikhail)",
+      "10h20min - 11h05min": "Cie (Aline)",
+      "11h05min - 11h50min": "Hist (Mikhail)"
+    },
+    "Quarta": {
+      "7h - 7h45min": "Mat (Eliane)",
+      "7h45min - 8h30min": "Geo (Ana Paula)",
+      "8h50min - 9:35h": "EF (Rafael)",
+      "9h35min - 10h20min": "Cie (Aline)",
+      "10h20min - 11h05min": "Port (Denise)",
+      "11h05min - 11h50min": "Mat (Eliane)"
+    },
+    "Quinta": {
+      "7h - 7h45min": "Port (Denise)",
+      "7h45min - 8h30min": "Port (Denise)",
+      "8h50min - 9:35h": "Art (Juliana S)",
+      "9h35min - 10h20min": "Port (Denise)",
+      "10h20min - 11h05min": "Ing (Andreia)",
+      "11h05min - 11h50min": "Art (Juliana S)"
+    },
+    "Sexta": {
+      "7h - 7h45min": "Port (Denise)",
+      "7h45min - 8h30min": "Mat (Eliane)",
+      "8h50min - 9:35h": "Hist (Mikhail)",
+      "9h35min - 10h20min": "Mat (Eliane)",
+      "10h20min - 11h05min": "Geo (Ana Paula)",
+      "11h05min - 11h50min": "Ing (Andreia)"
+    }
+  }
+}

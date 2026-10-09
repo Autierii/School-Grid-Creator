@@ -10,12 +10,14 @@ generator client {
 model School {
   id        String   @id @default(uuid())
   name      String
+  horarios  String?  // JSON com os blocos de aula usados no gerador
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   teachers  Teacher[]
   subjects  Subject[]
   classes   Class[]
+  schedules Schedule[]
 }
 
 model Teacher {
@@ -26,6 +28,7 @@ model Teacher {
   
   classes   TeacherClassSubject[]
   restrictions String? 
+  subjects  Subject[] @relation("TeacherSubjects")
 }
 
 model Subject {
@@ -36,6 +39,7 @@ model Subject {
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   
   classes   TeacherClassSubject[]
+  teachers  Teacher[] @relation("TeacherSubjects")
 }
 
 model Class {
@@ -58,3 +62,13 @@ model TeacherClassSubject {
   class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
+
+model Schedule {
+  id        String   @id @default(uuid())
+  name      String
+  data      String   // JSON com a grade pronta
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
