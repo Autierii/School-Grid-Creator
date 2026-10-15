@@ -1,43 +1,71 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: #f8fafc; /* slate-50 */
-    color: #0f172a; /* slate-900 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+/* ------------------------------------------------------------------
+   Tema: fontes e a cor da marca (use bg-brand-600, text-brand-700...)
+   ------------------------------------------------------------------ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #f0f3ff;
+  --color-brand-100: #e1e7ff;
+  --color-brand-200: #c8d2ff;
+  --color-brand-300: #a3b2ff;
+  --color-brand-400: #7a88fb;
+  --color-brand-500: #5a62f3;
+  --color-brand-600: #4744e6;
+  --color-brand-700: #3b35cb;
+  --color-brand-800: #312ea4;
+  --color-brand-900: #2d2c82;
+  --color-brand-950: #14133a;
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-pop-in: pop-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-slide-in: slide-in 0.25s ease-out both;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes slide-in {
+    from { transform: translateX(-100%); }
+    to { transform: none; }
   }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Animations */
-.fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-display;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+  button:not(:disabled), [role="button"], label[for] {
+    cursor: pointer;
+  }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Barra de rolagem discreta */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
 /* Impressão: só a grade aberta, uma turma/professor por página */
+.print-only { display: none; }
 @media print {
+  @page { size: A4 landscape; margin: 12mm; }
   body > *:not(.print-root) { display: none !important; }
   .print-root { position: static !important; background: white !important; backdrop-filter: none !important; }
   .print-root > div { height: auto !important; background: white !important; }

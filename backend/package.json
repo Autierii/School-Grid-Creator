@@ -1,27 +1,27 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
+  "description": "API do School Grid Creator: cadastros, gerador de grade horária e importação com IA.",
   "main": "dist/src/index.js",
+  "type": "commonjs",
   "scripts": {
-    "postinstall": "prisma skills sync || exit 0",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/src/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --require ts-node/register --test \"tests/**/*.test.ts\"",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "seed": "ts-node scripts/seed.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "5.22.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "multer": "^2.4.0",
-    "sqlite3": "^6.0.1"
+    "multer": "^2.4.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

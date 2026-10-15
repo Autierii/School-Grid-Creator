@@ -8,11 +8,5 @@
     "skipLibCheck": true,
     "outDir": "dist"
   },
-  "include": [
-    "src",
-    "*.ts"
-  ],
-  "exclude": [
-    "prisma.config.ts"
-  ]
+  "include": ["src", "scripts", "tests"]
 }

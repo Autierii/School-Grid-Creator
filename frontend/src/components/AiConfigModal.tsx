@@ -1,71 +1,69 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Settings, X } from 'lucide-react';
+import { KeyRound, ShieldCheck, Sparkles } from 'lucide-react';
+import { lerAiConfig, salvarAiConfig } from '../lib/aiConfig';
+import { useDialogs } from '../lib/dialogs';
+import { Button, Field, IconBadge, Input, Modal, Select } from './ui';
 
-const ler = (chave: string, padrao: string) => {
-  try {
-    return localStorage.getItem(chave) || padrao;
-  } catch {
-    return padrao;
-  }
-};
+const PROVEDORES = [
+  { value: 'gemini', label: 'Google Gemini', dica: 'Recomendado para fotos de tabelas.', url: 'https://aistudio.google.com/apikey' },
+  { value: 'claude', label: 'Anthropic Claude', dica: 'Ótimo com texto e imagens.', url: 'https://console.anthropic.com/settings/keys' },
+  { value: 'cohere', label: 'Cohere', dica: 'Somente texto.', url: 'https://dashboard.cohere.com/api-keys' },
+];
 
-function Conteudo({ onClose }: { onClose: () => void }) {
-  const [provider, setProvider] = useState(() => ler('ai_provider', 'gemini'));
-  const [token, setToken] = useState(() => ler('ai_token', ''));
+export default function AiConfigModal({ onClose }: { onClose: () => void }) {
+  const { toast } = useDialogs();
+  const [provider, setProvider] = useState(() => lerAiConfig().provider);
+  const [token, setToken] = useState(() => lerAiConfig().token);
+  const atual = PROVEDORES.find(p => p.value === provider) ?? PROVEDORES[0];
 
   const handleSave = () => {
-    localStorage.setItem('ai_provider', provider);
-    localStorage.setItem('ai_token', token.trim());
+    try {
+      salvarAiConfig(provider, token);
+      toast('Configurações de IA salvas.');
+    } catch {
+      toast('Não foi possível salvar neste navegador (modo privado?).', 'error');
+    }
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 fade-in" onClick={onClose}>
-      <div className="bg-white p-8 rounded-3xl max-w-md w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 p-2 rounded-xl hover:bg-slate-100">
-          <X size={22} />
-        </button>
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-slate-900">
-          <Settings className="text-violet-600" /> Configurações de IA
-        </h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Provedor de IA</label>
-            <select
-              value={provider}
-              onChange={e => setProvider(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-violet-500"
-            >
-              <option value="gemini">Google Gemini (recomendado para imagens)</option>
-              <option value="claude">Anthropic Claude</option>
-              <option value="cohere">Cohere (apenas texto)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Sua API Key</label>
-            <input
-              type="password"
-              value={token}
-              onChange={e => setToken(e.target.value)}
-              placeholder="Cole sua chave aqui..."
-              className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-violet-500"
-            />
-            <p className="text-xs text-slate-500 mt-2">
-              A chave fica salva apenas neste navegador e é enviada ao seu backend local somente na hora da importação.
-            </p>
-          </div>
-        </div>
-
-        <button onClick={handleSave} className="w-full mt-8 bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-colors">
-          Salvar Configurações
-        </button>
+    <Modal
+      size="sm"
+      title="Configurações de IA"
+      subtitle="Usadas na Importação Mágica (tela de Turmas)."
+      icon={<IconBadge icon={Sparkles} tone="violet" />}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="magic" onClick={handleSave}>Salvar</Button>
+        </>
+      }
+    >
+      <div className="space-y-5 p-6">
+        <Field label="Provedor de IA" hint={atual.dica}>
+          {id => (
+            <Select id={id} value={provider} onChange={e => setProvider(e.target.value)}>
+              {PROVEDORES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </Select>
+          )}
+        </Field>
+        <Field
+          label="Sua API Key"
+          hint={<>Não tem uma? <a href={atual.url} target="_blank" rel="noreferrer" className="font-medium text-violet-700 underline-offset-2 hover:underline">Gere sua chave do {atual.label}</a>.</>}
+        >
+          {id => (
+            <div className="relative">
+              <KeyRound size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400" />
+              <Input id={id} type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder="Cole sua chave aqui..." className="pl-10" />
+            </div>
+          )}
+        </Field>
+        <p className="flex gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+          <ShieldCheck size={16} className="shrink-0 text-emerald-500" />
+          A chave fica salva apenas neste navegador e só é enviada ao seu backend local no momento da importação.
+        </p>
       </div>
-    </div>
+    </Modal>
   );
-}
-
-export default function AiConfigModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  return isOpen ? createPortal(<Conteudo onClose={onClose} />, document.body) : null;
 }

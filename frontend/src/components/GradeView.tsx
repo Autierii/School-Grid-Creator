@@ -1,158 +1,73 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Printer, Users, Layers, X } from 'lucide-react';
-import { DIAS, parseAula, type Grade } from '../api';
-
-const CORES = [
-  'bg-indigo-50 text-indigo-700 border-indigo-100',
-  'bg-emerald-50 text-emerald-700 border-emerald-100',
-  'bg-amber-50 text-amber-800 border-amber-100',
-  'bg-rose-50 text-rose-700 border-rose-100',
-  'bg-sky-50 text-sky-700 border-sky-100',
-  'bg-violet-50 text-violet-700 border-violet-100',
-  'bg-lime-50 text-lime-800 border-lime-100',
-  'bg-orange-50 text-orange-700 border-orange-100',
-  'bg-teal-50 text-teal-700 border-teal-100',
-  'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
-];
-
-function corDa(texto: string) {
-  let h = 0;
-  for (const c of texto) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return CORES[h % CORES.length];
-}
-
-type Celula = { titulo: string; detalhe: string; cor: string } | null;
-type Tabela = { nome: string; celulas: Record<string, Record<string, Celula>> };
-
-function horariosDaGrade(grade: Grade) {
-  const primeira = Object.values(grade)[0];
-  return primeira ? Object.keys(primeira[DIAS[0]] ?? {}) : [];
-}
-
-function porTurma(grade: Grade, horarios: string[]): Tabela[] {
-  return Object.keys(grade).map(turma => {
-    const celulas: Tabela['celulas'] = {};
-    for (const dia of DIAS) {
-      celulas[dia] = {};
-      for (const hora of horarios) {
-        const aula = parseAula(grade[turma]?.[dia]?.[hora]);
-        celulas[dia][hora] = aula && { titulo: aula.materia, detalhe: aula.professor, cor: corDa(aula.materia) };
-      }
-    }
-    return { nome: turma, celulas };
-  });
-}
-
-function porProfessor(grade: Grade, horarios: string[]): Tabela[] {
-  const mapa = new Map<string, Tabela>();
-  for (const turma of Object.keys(grade)) {
-    for (const dia of DIAS) {
-      for (const hora of horarios) {
-        const aula = parseAula(grade[turma]?.[dia]?.[hora]);
-        if (!aula?.professor) continue;
-        let t = mapa.get(aula.professor);
-        if (!t) {
-          t = { nome: aula.professor, celulas: Object.fromEntries(DIAS.map(d => [d, {}])) };
-          mapa.set(aula.professor, t);
-        }
-        const atual = t.celulas[dia][hora];
-        t.celulas[dia][hora] = atual
-          ? { ...atual, detalhe: `${atual.detalhe}, ${turma}`, cor: 'bg-red-50 text-red-700 border-red-200' } // choque
-          : { titulo: turma, detalhe: aula.materia, cor: corDa(aula.materia) };
-      }
-    }
-  }
-  return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome));
-}
-
-function exportarCsv(nomeArquivo: string, tabelas: Tabela[], horarios: string[]) {
-  const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const linhas: string[] = [];
-  for (const t of tabelas) {
-    linhas.push(esc(t.nome));
-    linhas.push(['Horário', ...DIAS].map(esc).join(';'));
-    for (const hora of horarios) {
-      linhas.push([hora, ...DIAS.map(d => {
-        const c = t.celulas[d]?.[hora];
-        return c ? `${c.titulo} (${c.detalhe})` : '';
-      })].map(esc).join(';'));
-    }
-    linhas.push('');
-  }
-  // BOM para o Excel abrir acentos corretamente
-  const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${nomeArquivo.replace(/[^\w\- ]+/g, '_')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import { Download, Layers, Printer, Users, X } from 'lucide-react';
+import { DIAS } from '../lib/api';
+import { exportarCsv, horariosDaGrade, porProfessor, porTurma } from '../lib/grade';
+import type { Grade } from '../lib/types';
+import { Button, SearchInput, Tabs } from './ui';
 
 export function GradeView({ grade, horarios, nome }: { grade: Grade; horarios?: string[]; nome: string }) {
   const [modo, setModo] = useState<'turma' | 'professor'>('turma');
-  const horas = horarios?.length ? horarios : horariosDaGrade(grade);
+  const [busca, setBusca] = useState('');
+  const horas = useMemo(() => (horarios?.length ? horarios : horariosDaGrade(grade)), [grade, horarios]);
   const tabelas = useMemo(
     () => (modo === 'turma' ? porTurma(grade, horas) : porProfessor(grade, horas)),
-    [grade, horas, modo]
+    [grade, horas, modo],
   );
+  const visiveis = tabelas.filter(t => t.nome.toLowerCase().includes(busca.trim().toLowerCase()));
 
   return (
-    <div className="max-w-[1400px] mx-auto w-full">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 no-print">
-        <div className="inline-flex bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-          {([['turma', 'Por turma', Layers], ['professor', 'Por professor', Users]] as const).map(([valor, label, Icon]) => (
-            <button
-              key={valor}
-              onClick={() => setModo(valor)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${modo === valor ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-            >
-              <Icon size={16} /> {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => exportarCsv(`${nome} - ${modo}`, tabelas, horas)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">
-            <Download size={16} /> Exportar CSV
-          </button>
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">
-            <Printer size={16} /> Imprimir
-          </button>
+    <div className="mx-auto w-full max-w-[1400px]">
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={modo}
+          onChange={setModo}
+          tabs={[
+            { value: 'turma', label: 'Por turma', icon: Layers, count: Object.keys(grade).length },
+            { value: 'professor', label: 'Por professor', icon: Users },
+          ]}
+        />
+        <div className="flex flex-wrap gap-2">
+          {tabelas.length > 4 && <SearchInput value={busca} onChange={setBusca} placeholder={modo === 'turma' ? 'Filtrar turma...' : 'Filtrar professor...'} />}
+          <Button variant="secondary" icon={Download} onClick={() => exportarCsv(`${nome} - por ${modo}`, visiveis, horas)}>CSV</Button>
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Imprimir</Button>
         </div>
       </div>
 
-      <div className="space-y-8">
-        {tabelas.map(t => (
-          <div key={t.nome} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm print-break">
-            <div className="bg-slate-900 px-5 py-4">
-              <h3 className="text-xl font-bold text-white text-center">{t.nome}</h3>
-            </div>
+      <div className="grid gap-6 2xl:grid-cols-2">
+        {visiveis.map(t => (
+          <section key={t.nome} className="print-break overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <header className="flex items-center gap-3 border-b border-slate-100 px-5 py-3.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                {modo === 'turma' ? <Layers size={16} /> : <Users size={16} />}
+              </span>
+              <h3 className="text-lg font-bold text-slate-900">{t.nome}</h3>
+            </header>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
                 <thead>
-                  <tr>
-                    <th className="p-4 border-b border-slate-200 bg-slate-50 text-slate-400 font-bold text-xs uppercase tracking-wider w-36">Horário</th>
+                  <tr className="bg-slate-50/80">
+                    <th className="w-28 px-4 py-2.5 text-xs font-semibold tracking-wider text-slate-400 uppercase">Horário</th>
                     {DIAS.map(dia => (
-                      <th key={dia} className="p-4 border-b border-l border-slate-200 bg-slate-50 text-slate-400 font-bold text-xs uppercase tracking-wider text-center w-1/5">{dia}</th>
+                      <th key={dia} className="px-2 py-2.5 text-center text-xs font-semibold tracking-wider text-slate-500 uppercase">{dia}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {horas.map(hora => (
-                    <tr key={hora}>
-                      <td className="p-4 border-b border-slate-100 font-semibold text-slate-600 bg-slate-50/50 text-sm whitespace-nowrap">{hora}</td>
+                    <tr key={hora} className="border-t border-slate-100">
+                      <td className="px-4 py-2 text-sm font-semibold whitespace-nowrap text-slate-600">{hora}</td>
                       {DIAS.map(dia => {
                         const c = t.celulas[dia]?.[hora];
                         return (
-                          <td key={dia} className="p-2 border-b border-l border-slate-100 text-center align-middle">
+                          <td key={dia} className="p-1.5 text-center align-middle">
                             {c ? (
-                              <div className={`rounded-xl border px-2 py-2 ${c.cor}`}>
-                                <div className="font-bold">{c.titulo}</div>
-                                <div className="text-xs font-medium opacity-80 mt-0.5">{c.detalhe}</div>
+                              <div className={`rounded-lg px-2 py-1.5 ring-1 ring-inset ${c.cor}`}>
+                                <div className="truncate text-sm font-bold">{c.titulo}</div>
+                                <div className="truncate text-[11px] font-medium opacity-75" title={c.detalhe}>{c.detalhe}</div>
                               </div>
                             ) : (
-                              <span className="text-slate-300">—</span>
+                              <div className="flex h-[46px] items-center justify-center rounded-lg border border-dashed border-slate-200 text-xs text-slate-300">livre</div>
                             )}
                           </td>
                         );
@@ -162,14 +77,14 @@ export function GradeView({ grade, horarios, nome }: { grade: Grade; horarios?: 
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         ))}
       </div>
     </div>
   );
 }
 
-// Tela cheia usada para exibir uma grade (gerada ou do histórico).
+/** Tela cheia usada para exibir uma grade (gerada ou do histórico). */
 export function GradeModal({ titulo, subtitulo, icone, acoes, onClose, children }: {
   titulo: string;
   subtitulo?: ReactNode;
@@ -178,30 +93,43 @@ export function GradeModal({ titulo, subtitulo, icone, acoes, onClose, children 
   onClose: () => void;
   children: ReactNode;
 }) {
+  const fechar = useRef(onClose);
+  useEffect(() => { fechar.current = onClose; });
+
+  useEffect(() => {
+    // Esc fecha, a menos que um diálogo (ex.: confirmação) esteja aberto por cima.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('[role="dialog"][aria-labelledby]') && fechar.current();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, []);
+
   return createPortal(
-    <div className="print-root fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex fade-in">
-      <div className="bg-slate-50 w-full h-full flex flex-col">
-        <div className="p-6 border-b border-slate-200 flex flex-wrap gap-4 justify-between items-center bg-white shrink-0 shadow-sm z-10 no-print">
-          <div className="flex items-center gap-4">
+    <div className="print-root fixed inset-0 z-50 flex bg-slate-950/80 backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true" aria-label={titulo}>
+      <div className="flex h-full w-full flex-col bg-slate-50">
+        <div className="no-print z-10 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-8">
+          <div className="flex min-w-0 items-center gap-4">
             {icone}
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900">{titulo}</h3>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">{titulo}</h2>
               {subtitulo && <div className="text-sm text-slate-500">{subtitulo}</div>}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {acoes}
-            <button onClick={onClose} className="bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 px-5 py-3 rounded-xl flex items-center gap-2 font-bold transition-colors">
-              <X size={20} /> Fechar
-            </button>
+            <Button variant="ghost" icon={X} onClick={onClose}>Fechar</Button>
           </div>
         </div>
-        <div className="p-8 overflow-y-auto flex-1 print-scroll">
-          <h2 className="hidden print-only text-2xl font-bold mb-4">{titulo}</h2>
+        <div className="print-scroll flex-1 overflow-y-auto p-4 sm:p-8">
+          <h1 className="print-only mb-4 text-2xl font-bold">{titulo}</h1>
           {children}
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

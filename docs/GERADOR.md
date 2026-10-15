@@ -186,7 +186,7 @@ Medições num notebook comum (Node 24):
 
 | Cenário | Tamanho | Resultado | Tempo |
 |---|---|---|---|
-| Escola real de exemplo (`create_complex_school.ts`) | 8 turmas · 17 prof. · 30 slots · muitas restrições | ✅ sem conflitos | 2–8 ms |
+| Escola real de exemplo (`npm run seed`) | 8 turmas · 17 prof. · 30 slots · muitas restrições | ✅ sem conflitos | 2–8 ms |
 | Sintético | 20 turmas · 30 prof. · 30 slots | ✅ | ~5 ms |
 | Sintético | 40 turmas · 50 prof. · 30 slots · 20% bloqueios | ✅ | ~20 ms |
 | Carga 100% (cada professor ocupado em todos os slots) | 15 turmas × 15 prof. | ✅ | ~7 ms |

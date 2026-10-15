@@ -1,0 +1,16 @@
+{
+  "name": "school-grid-creator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monte a grade horária da sua escola em segundos, sem choques de professores.",
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix backend run db:push",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "seed": "npm --prefix backend run seed",
+    "test": "npm --prefix backend test",
+    "check": "npm --prefix backend run typecheck && npm --prefix backend test && npm --prefix frontend run lint && npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
+}

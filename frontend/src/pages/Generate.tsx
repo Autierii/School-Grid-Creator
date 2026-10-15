@@ -1,47 +1,61 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Calendar as CalendarIcon, CheckCircle2, AlertTriangle, Play, Save, Loader2 } from 'lucide-react';
-import { api, ApiError, type Grade } from '../api';
+import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Clock, Gauge, Layers, Play, Save, Users } from 'lucide-react';
+import HorariosEditor from '../components/HorariosEditor';
 import { GradeModal, GradeView } from '../components/GradeView';
-
-type Resultado = {
-  grade: Grade;
-  horarios: string[];
-  completa: boolean;
-  conflitos: string[];
-  avisos: string[];
-  tempoMs: number;
-};
+import { Alert, Button, Card, IconBadge, Input, PageHeader } from '../components/ui';
+import { api, ApiError, DIAS, mensagemDeErro } from '../lib/api';
+import { useDialogs } from '../lib/dialogs';
+import { useSchool } from '../lib/hooks';
+import type { ResultadoGrade } from '../lib/types';
 
 export default function Generate() {
-  const { schoolId } = useParams();
-  const [horarios, setHorarios] = useState('');
-  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const { school, reloadSchool } = useSchool();
+  const { toast } = useDialogs();
+
+  // `null` = ainda não editado: usa os horários salvos na escola.
+  const [editados, setEditados] = useState<string[] | null>(null);
+  const horarios = editados ?? school?.horarios ?? [];
+  const alterado = editados !== null && editados.join('|') !== school?.horarios.join('|');
+
+  const [resultado, setResultado] = useState<ResultadoGrade | null>(null);
   const [loading, setLoading] = useState(false);
+  const [salvandoHorarios, setSalvandoHorarios] = useState(false);
   const [error, setError] = useState('');
   const [problemas, setProblemas] = useState<string[]>([]);
   const [nomeGrade, setNomeGrade] = useState('');
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [salva, setSalva] = useState(false);
 
-  useEffect(() => {
-    api(`/schools/${schoolId}`)
-      .then(s => setHorarios(s.horarios.join(', ')))
-      .catch(() => setHorarios('7h, 8h, 9h, 10h, 11h'));
-  }, [schoolId]);
+  if (!school) return null;
+
+  const slots = DIAS.length * horarios.length;
+
+  const handleSaveHorarios = async () => {
+    setSalvandoHorarios(true);
+    try {
+      await api(`/schools/${school.id}`, { method: 'PUT', json: { horarios } });
+      setEditados(null);
+      reloadSchool();
+      toast('Horários salvos.');
+    } catch (e) {
+      toast(mensagemDeErro(e), 'error');
+    }
+    setSalvandoHorarios(false);
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
     setProblemas([]);
     setResultado(null);
-    setSaveSuccess(false);
+    setSalva(false);
     try {
-      const parsedHorarios = horarios.split(',').map(h => h.trim()).filter(h => h);
-      const data = await api<Resultado>(`/schools/${schoolId}/generate`, { method: 'POST', json: { horarios: parsedHorarios } });
+      const data = await api<ResultadoGrade>(`/schools/${school.id}/generate`, { method: 'POST', json: { horarios } });
       setResultado(data);
-      setNomeGrade(`Grade de ${new Date().toLocaleString('pt-BR')}`);
+      setNomeGrade(`Grade de ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`);
+      setEditados(null);
+      reloadSchool(); // o backend salva os horários usados
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido ao gerar grade.');
+      setError(mensagemDeErro(err));
       if (err instanceof ApiError && Array.isArray(err.data?.problemas)) setProblemas(err.data.problemas);
     }
     setLoading(false);
@@ -50,110 +64,109 @@ export default function Generate() {
   const handleSave = async () => {
     if (!resultado) return;
     try {
-      await api(`/schools/${schoolId}/schedules`, {
+      await api(`/schools/${school.id}/schedules`, {
         method: 'POST',
         json: { name: nomeGrade.trim() || 'Grade sem nome', data: JSON.stringify(resultado.grade) },
       });
-      setSaveSuccess(true);
+      setSalva(true);
+      reloadSchool();
+      toast('Grade salva no histórico.');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao salvar grade.');
+      toast(mensagemDeErro(err), 'error');
     }
   };
 
   return (
     <>
-      <div className="max-w-6xl mx-auto fade-in">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Gerar Nova Grade</h2>
-          <p className="text-slate-500 mt-1">Defina os parâmetros e deixe o sistema resolver os conflitos de horários para você.</p>
-        </div>
+      <PageHeader title="Gerar nova grade" description="Defina os horários de aula e deixe o sistema distribuir as aulas sem choques de professor." />
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-indigo-50 text-indigo-600 p-2 rounded-lg">
-              <CalendarIcon size={20} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-6 lg:col-span-2">
+          <div className="mb-5 flex items-center gap-3">
+            <IconBadge icon={Clock} size="sm" />
+            <div>
+              <h2 className="font-bold text-slate-900">Horários das aulas</h2>
+              <p className="text-sm text-slate-500">Os mesmos para os 5 dias da semana, na ordem em que acontecem.</p>
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Configuração de Horários</h3>
           </div>
 
-          <label className="block text-sm font-medium text-slate-700 mb-2">Blocos de Aula (separados por vírgula)</label>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <input
-              type="text"
-              value={horarios}
-              onChange={e => setHorarios(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !loading && handleGenerate()}
-              className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex-1 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-            />
-            <button
-              onClick={handleGenerate}
-              disabled={loading || !horarios.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-wait text-white font-semibold py-4 px-8 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
-            >
-              {loading ? <><Loader2 size={20} className="animate-spin" /> Processando...</> : <><Play size={20} fill="currentColor" /> Gerar Solução</>}
-            </button>
+          <HorariosEditor value={horarios} onChange={setEditados} />
+
+          {alterado && (
+            <Alert tone="warning" className="mt-4">
+              As restrições dos professores usam os <strong>nomes</strong> dos horários. Se você renomeou algum, revise as restrições na tela de Professores.
+            </Alert>
+          )}
+
+          <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+            {alterado && (
+              <Button variant="secondary" icon={Save} loading={salvandoHorarios} onClick={handleSaveHorarios} disabled={!horarios.length}>
+                Salvar horários
+              </Button>
+            )}
+            <Button size="lg" icon={Play} loading={loading} onClick={handleGenerate} disabled={!horarios.length}>
+              {loading ? 'Gerando...' : 'Gerar grade'}
+            </Button>
           </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Exemplo: 7h, 7h50, 8h40, 9h50, 10h40. As restrições dos professores precisam usar exatamente estes mesmos nomes de horário.
-          </p>
 
           {error && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">
-              <div className="font-bold">{error}</div>
+            <Alert tone="error" title={error} className="mt-5">
               {problemas.length > 0 && (
-                <ul className="list-disc ml-5 mt-2 space-y-1 text-sm">
-                  {problemas.map(p => <li key={p}>{p}</li>)}
-                </ul>
+                <ul className="mt-1 list-disc space-y-1 pl-5">{problemas.map(p => <li key={p}>{p}</li>)}</ul>
               )}
-            </div>
+            </Alert>
           )}
-        </div>
+        </Card>
+
+        <Card className="h-fit p-6">
+          <h2 className="mb-4 flex items-center gap-2 font-bold text-slate-900"><Gauge size={18} className="text-slate-400" /> Resumo</h2>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between"><dt className="flex items-center gap-2 text-slate-500"><Layers size={15} /> Turmas</dt><dd className="font-semibold">{school._count.classes}</dd></div>
+            <div className="flex justify-between"><dt className="flex items-center gap-2 text-slate-500"><Users size={15} /> Professores</dt><dd className="font-semibold">{school._count.teachers}</dd></div>
+            <div className="flex justify-between"><dt className="flex items-center gap-2 text-slate-500"><Clock size={15} /> Aulas possíveis por turma</dt><dd className="font-semibold">{slots}</dd></div>
+            <div className="flex justify-between border-t border-slate-100 pt-3"><dt className="text-slate-500">Aulas atribuídas (total)</dt><dd className="font-semibold">{school.totalAulas ?? 0}</dd></div>
+          </dl>
+          <p className="mt-5 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">
+            O gerador garante: nenhum professor em duas turmas ao mesmo tempo, horários bloqueados respeitados e no máximo 2 aulas da mesma disciplina por dia em cada turma.
+          </p>
+        </Card>
       </div>
 
       {resultado && (
         <GradeModal
           titulo={resultado.completa ? 'Grade gerada com sucesso!' : 'Grade gerada com conflitos'}
           subtitulo={resultado.completa
-            ? `Nenhum choque de horário. Resolvido em ${(resultado.tempoMs / 1000).toFixed(1)}s.`
-            : 'Não foi possível eliminar todos os choques. Revise os avisos abaixo.'}
-          icone={
-            <div className={`p-3 rounded-xl ${resultado.completa ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-              {resultado.completa ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
-            </div>
-          }
+            ? `Nenhum choque de horário · resolvida em ${resultado.tempoMs < 1000 ? `${resultado.tempoMs} ms` : `${(resultado.tempoMs / 1000).toFixed(1)} s`}`
+            : 'Não foi possível eliminar todos os choques. Veja os detalhes abaixo.'}
+          icone={<IconBadge icon={resultado.completa ? CheckCircle2 : AlertTriangle} tone={resultado.completa ? 'emerald' : 'amber'} />}
           acoes={
             <>
-              <input
+              <Input
                 value={nomeGrade}
                 onChange={e => setNomeGrade(e.target.value)}
-                disabled={saveSuccess}
-                className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-slate-900 w-64 focus:outline-none focus:border-indigo-500 disabled:opacity-60"
+                disabled={salva}
+                className="w-full sm:w-64"
                 placeholder="Nome da grade"
+                aria-label="Nome da grade"
               />
-              <button
-                onClick={handleSave}
-                disabled={saveSuccess}
-                className={`font-semibold py-3 px-6 rounded-xl transition-all flex items-center gap-2 shadow-sm ${saveSuccess ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
-              >
-                {saveSuccess ? <><CheckCircle2 size={20} /> Salva no Histórico</> : <><Save size={20} /> Salvar Grade</>}
-              </button>
+              <Button variant={salva ? 'secondary' : 'success'} icon={salva ? CheckCircle2 : Save} onClick={handleSave} disabled={salva}>
+                {salva ? 'Salva no histórico' : 'Salvar grade'}
+              </Button>
             </>
           }
           onClose={() => setResultado(null)}
         >
           {(resultado.conflitos.length > 0 || resultado.avisos.length > 0) && (
-            <div className="max-w-[1400px] mx-auto mb-6 space-y-3 no-print">
+            <div className="no-print mx-auto mb-6 max-w-[1400px] space-y-3">
               {resultado.conflitos.length > 0 && (
-                <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">
-                  <div className="font-bold mb-1">Conflitos ({resultado.conflitos.length})</div>
-                  <ul className="list-disc ml-5 text-sm space-y-0.5">{resultado.conflitos.map(c => <li key={c}>{c}</li>)}</ul>
-                </div>
+                <Alert tone="error" title={`Conflitos (${resultado.conflitos.length})`}>
+                  <ul className="list-disc space-y-0.5 pl-5">{resultado.conflitos.map(c => <li key={c}>{c}</li>)}</ul>
+                </Alert>
               )}
               {resultado.avisos.length > 0 && (
-                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl">
-                  <div className="font-bold mb-1">Avisos ({resultado.avisos.length})</div>
-                  <ul className="list-disc ml-5 text-sm space-y-0.5">{resultado.avisos.map(a => <li key={a}>{a}</li>)}</ul>
-                </div>
+                <Alert tone="warning" title={`Avisos (${resultado.avisos.length})`}>
+                  <ul className="list-disc space-y-0.5 pl-5">{resultado.avisos.map(a => <li key={a}>{a}</li>)}</ul>
+                </Alert>
               )}
             </div>
           )}

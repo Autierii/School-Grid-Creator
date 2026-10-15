@@ -29,7 +29,7 @@ flowchart TB
     end
 
     subgraph "Servidor Node :3001"
-        R[Rotas Express<br/>src/index.ts]
+        R[Rotas Express<br/>src/routes/*.ts]
         SD[school-data.ts<br/>banco → formato do gerador]
         G[generator.ts<br/>busca tabu]
         AI[ai.ts<br/>importação]
@@ -61,25 +61,39 @@ backend/
 │   ├── schema.prisma          # modelo de dados (fonte da verdade)
 │   └── dev.db                 # banco SQLite (ignorado no git)
 ├── src/
-│   ├── index.ts               # app Express: rotas, validação, tratamento de erros
+│   ├── index.ts               # ponto de entrada: carrega .env e sobe o servidor
+│   ├── env.ts                 # lê backend/.env (process.loadEnvFile)
+│   ├── app.ts                 # createApp(): middlewares, routers, 404 e erros
+│   ├── http.ts                # HttpError, validadores e errorHandler
+│   ├── routes/
+│   │   ├── schools.ts         # /schools (+ contadores e total de aulas)
+│   │   ├── teachers.ts        # /teachers, restrições, vínculo com disciplinas
+│   │   ├── subjects.ts        # /subjects
+│   │   ├── classes.ts         # /classes e /lessons (atribuições)
+│   │   └── schedules.ts       # /generate, /schedules e /ai-import
 │   ├── generator.ts           # resolverGrade(): verificação + busca tabu
 │   ├── school-data.ts         # carregarMaterias(), parseRestricoes()
 │   ├── ai.ts                  # processAiImport(): chama a IA e grava os dados
 │   └── db.ts                  # instância única do PrismaClient
-├── create_complex_school.ts   # seed: escola de exemplo + geração
-├── save_complex_schedule.js   # salva grade-final.json no histórico
-└── test-api.js                # script manual de teste da API
+├── scripts/
+│   └── seed.ts                # npm run seed: escola de exemplo + teste do gerador
+└── tests/
+    └── generator.test.ts      # npm test: testes do gerador (node:test)
 ```
 
-### `index.ts`
+### `app.ts`, `routes/` e `http.ts`
 
+- `createApp()` monta o Express sem chamar `listen` (fácil de testar). Cada arquivo em `routes/` exporta um `Router` com caminhos completos (`/schools/:schoolId/teachers`, `/teachers/:id`…), montado em `/api`.
 - Express 5 — erros lançados em handlers `async` vão direto ao middleware de erro.
-- `HttpError(status, mensagem)` para erros esperados; o middleware final converte:
+- `HttpError(status, mensagem)` para erros esperados; o `errorHandler` converte:
   - `HttpError` → status + `{ error }`;
   - Prisma `P2025` (registro inexistente) → `404`;
+  - Prisma `P2003` (escola/professor/disciplina relacionado não existe) → `404`;
+  - JSON malformado no corpo → `400`;
   - upload acima de 10 MB → `400`;
   - qualquer outro → `500` (logado no console).
-- Helpers: `texto()` valida campos obrigatórios; `restricoesJson()` normaliza restrições (aceita array ou string JSON).
+- Rotas desconhecidas em `/api/*` → `404 { error: "Rota não encontrada." }`. `GET /api/health` responde `{ ok: true }`.
+- Validadores: `texto()` (obrigatório), `quantidadeAulas()` (inteiro ≥ 1), `listaHorarios()`, `restricoesJson()` (aceita array ou string JSON).
 
 ### `school-data.ts`
 
@@ -192,16 +206,29 @@ Dias válidos: `Segunda`, `Terça`, `Quarta`, `Quinta`, `Sexta`.
 ```
 frontend/src/
 ├── main.tsx                 # bootstrap do React
-├── App.tsx                  # rotas, tela de escolas, layout do painel
-├── api.ts                   # api() helper, ApiError, tipos, DIAS, parseAula()
-├── index.css                # Tailwind, animações, estilos de impressão
+├── App.tsx                  # rotas (React Router) + DialogProvider
+├── index.css                # Tailwind, tema (cor brand, fontes, animações), impressão
+├── lib/
+│   ├── api.ts               # api() helper, ApiError, DIAS, parseAula(), plural()
+│   ├── types.ts             # tipos das respostas da API
+│   ├── grade.ts             # grade por turma/professor, cores, exportação CSV
+│   ├── hooks.ts             # useSchool() e useAction()
+│   ├── dialogs.ts           # useDialogs(): confirm, prompt e toast
+│   └── aiConfig.ts          # provedor + chave de IA no localStorage
 ├── pages/
+│   ├── Schools.tsx          # lista de escolas
+│   ├── SchoolLayout.tsx     # menu da escola + <Outlet> com a escola carregada
+│   ├── SchoolHome.tsx       # visão geral: números e primeiros passos
 │   ├── Teachers.tsx         # professores + tabela de restrições
 │   ├── Subjects.tsx         # disciplinas
 │   ├── Classes.tsx          # turmas + atribuições (+ MagicImport)
-│   ├── Generate.tsx         # geração da grade
+│   ├── Generate.tsx         # horários + geração da grade
 │   └── Schedules.tsx        # histórico
 └── components/
+    ├── ui/index.tsx         # Button, Modal, Alert, Tabs, EmptyState, Field...
+    ├── AppShell.tsx         # layout: menu lateral (gaveta no celular)
+    ├── DialogProvider.tsx   # diálogos e toasts no lugar de alert/confirm/prompt
+    ├── HorariosEditor.tsx   # editor de blocos de aula com modelos prontos
     ├── GradeView.tsx        # GradeView (tabelas, CSV, impressão) e GradeModal (tela cheia)
     ├── MagicImport.tsx      # painel de importação por IA
     └── AiConfigModal.tsx    # provedor + chave de IA
@@ -212,7 +239,7 @@ frontend/src/
 | Caminho | Tela |
 |---|---|
 | `/` | Lista de escolas |
-| `/school/:schoolId` | Painel da escola (boas-vindas) |
+| `/school/:schoolId` | Visão geral da escola |
 | `/school/:schoolId/teachers` | Professores |
 | `/school/:schoolId/subjects` | Disciplinas |
 | `/school/:schoolId/classes` | Turmas + Importação Mágica |
@@ -221,10 +248,13 @@ frontend/src/
 
 ### Padrões
 
-- **`api()`** em `api.ts` centraliza `fetch`: prefixa `VITE_API_URL`, serializa `json`, converte erros em `ApiError` (com `status` e `data`) e dá uma mensagem amigável quando o backend está offline.
-- Cada página busca seus dados com `useCallback` + `useEffect` e recarrega após cada mutação (função `run()`).
-- Modais usam `createPortal(…, document.body)`; o item selecionado é guardado por **id** e derivado da lista, evitando dados desatualizados.
-- **Impressão**: `GradeModal` recebe a classe `print-root`; o CSS de `@media print` esconde o resto da página e quebra uma tabela por folha.
+- **`api()`** em `lib/api.ts` centraliza `fetch`: prefixa `VITE_API_URL`, serializa `json`, converte erros em `ApiError` (com `status` e `data`) e dá uma mensagem amigável quando o backend está offline.
+- **`SchoolLayout`** carrega a escola uma vez e a entrega às páginas via `<Outlet context>`; as páginas leem com **`useSchool()`** (nome, horários, contadores) e chamam `reloadSchool()` quando algo muda.
+- **`useAction(refresh)`** executa uma mutação, mostra erro/sucesso em toast e recarrega a página e os contadores do menu.
+- **Diálogos**: nada de `alert/confirm/prompt` do navegador — use `useDialogs()` (`confirm`, `prompt` com vários campos, `toast`).
+- **Componentes de UI** em `components/ui`: use-os em vez de repetir classes Tailwind. A cor da marca é `brand-*` (definida em `index.css`).
+- O item selecionado é guardado por **id** e derivado da lista, evitando dados desatualizados. O `Modal` fecha com Esc/clique fora e trava a rolagem do fundo.
+- **Impressão**: `GradeModal` recebe a classe `print-root`; o CSS de `@media print` esconde o resto da página e quebra uma tabela por folha (A4 paisagem).
 
 ---
 

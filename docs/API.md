@@ -1,6 +1,6 @@
 # 🔌 Referência da API
 
-API REST do backend (`backend/src/index.ts`).
+API REST do backend (rotas em `backend/src/routes/`).
 
 > ⬅️ [Voltar ao README](../README.md)
 
@@ -22,6 +22,7 @@ API REST do backend (`backend/src/index.ts`).
 | [Geração](#geração-da-grade) | `POST /schools/:schoolId/generate` |
 | [Histórico](#histórico-de-grades) | `GET/POST /schools/:schoolId/schedules` · `PUT/DELETE /schedules/:id` |
 | [Importação IA](#importação-com-ia) | `POST /schools/:schoolId/ai-import` |
+| Saúde | `GET /health` → `{ "ok": true }` |
 
 ---
 
@@ -35,8 +36,8 @@ Todas as falhas retornam:
 
 | Status | Quando |
 |---|---|
-| `400` | Campo obrigatório vazio, valor inválido, IDs de outra escola, falha da IA, imagem > 10 MB |
-| `404` | Registro não encontrado |
+| `400` | JSON malformado, campo obrigatório vazio, valor inválido, IDs de outra escola, falha da IA, imagem > 10 MB |
+| `404` | Registro não encontrado, registro relacionado inexistente (ex.: escola excluída) ou rota inexistente |
 | `422` | Grade impossível (inclui `problemas: string[]`) |
 | `500` | Erro inesperado (detalhes no console do servidor) |
 
@@ -46,14 +47,14 @@ Todas as falhas retornam:
 
 ### `GET /schools`
 
-Lista as escolas (mais antigas primeiro) com contagens.
+Lista as escolas (mais antigas primeiro) com contagens. `horarios` vem sempre como array (padrão `["7h","8h","9h","10h","11h"]` se nunca foi configurado).
 
 ```json
 [
   {
     "id": "6f1c…",
     "name": "Escola Turno Manhã",
-    "horarios": "[\"7h\",\"8h\"]",
+    "horarios": ["7h", "8h", "9h", "10h", "11h"],
     "createdAt": "2026-10-08T12:00:00.000Z",
     "updatedAt": "2026-10-08T12:00:00.000Z",
     "_count": { "teachers": 17, "classes": 8, "subjects": 10, "schedules": 2 }
@@ -67,14 +68,14 @@ Lista as escolas (mais antigas primeiro) com contagens.
 { "name": "Escola Nova" }
 ```
 
-Retorna a escola criada.
+Retorna a escola criada (mesmo formato do `GET /schools`).
 
 ### `GET /schools/:id`
 
-Retorna a escola com `horarios` **já como array** (padrão `["7h","8h","9h","10h","11h"]` se nunca gerou grade).
+Retorna a escola com `horarios` como array, os contadores e `totalAulas` (soma das aulas semanais atribuídas).
 
 ```json
-{ "id": "6f1c…", "name": "Escola Nova", "horarios": ["7h", "8h", "9h", "10h", "11h"], "…": "…" }
+{ "id": "6f1c…", "name": "Escola Nova", "horarios": ["7h", "8h", "9h", "10h", "11h"], "_count": { "…": 0 }, "totalAulas": 240 }
 ```
 
 ### `PUT /schools/:id`

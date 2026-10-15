@@ -1,98 +1,96 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { useParams } from 'react-router-dom';
-import { Layers, Plus, Link as LinkIcon, Trash2, GraduationCap, X, BookOpen, User, Pencil } from 'lucide-react';
-import { api, DIAS } from '../api';
+import { GraduationCap, Layers, Link as LinkIcon, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
 import MagicImport from '../components/MagicImport';
-
-type Subject = { id: string; name: string; sigla: string };
-type Teacher = { id: string; name: string; subjects: Subject[] };
-type ClassItem = { id: string; name: string };
-type Lesson = { id: string; classId: string; aulas: number; teacher: Teacher; subject: Subject };
+import { Alert, Badge, Button, EmptyState, Field, IconBadge, IconButton, Modal, PageHeader, QuickAdd, Select, TileButton, quickAddInputClass } from '../components/ui';
+import { api, DIAS, mensagemDeErro } from '../lib/api';
+import { corDa } from '../lib/grade';
+import { useDialogs } from '../lib/dialogs';
+import { useAction, useSchool } from '../lib/hooks';
+import type { ClassItem, Lesson, Subject, Teacher } from '../lib/types';
 
 export default function Classes() {
-  const { schoolId } = useParams();
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const { school, reloadSchool } = useSchool();
+  const { confirm, prompt } = useDialogs();
+  const schoolId = school?.id;
+  const slotsSemana = DIAS.length * (school?.horarios.length ?? 0);
+
+  const [classes, setClasses] = useState<ClassItem[] | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [slotsSemana, setSlotsSemana] = useState(0);
-  const [name, setName] = useState('');
+  const [nome, setNome] = useState('');
   const [error, setError] = useState('');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selectedClass = classes.find(c => c.id === selectedId) ?? null;
+  const selectedClass = classes?.find(c => c.id === selectedId) ?? null;
 
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [aulas, setAulas] = useState('1');
+  const [aulas, setAulas] = useState(1);
 
   const fetchData = useCallback(() => {
+    if (!schoolId) return;
     Promise.all([
       api<ClassItem[]>(`/schools/${schoolId}/classes`),
       api<Teacher[]>(`/schools/${schoolId}/teachers`),
       api<Subject[]>(`/schools/${schoolId}/subjects`),
       api<Lesson[]>(`/schools/${schoolId}/lessons`),
-      api(`/schools/${schoolId}`),
     ])
-      .then(([c, t, s, l, school]) => {
+      .then(([c, t, s, l]) => {
         setClasses(c);
         setTeachers(t);
         setSubjects(s);
         setLessons(l);
-        setSlotsSemana(DIAS.length * school.horarios.length);
         setError('');
       })
-      .catch(e => setError(e.message));
+      .catch(e => setError(mensagemDeErro(e)));
   }, [schoolId]);
 
   useEffect(fetchData, [fetchData]);
 
-  const run = async (fn: () => Promise<unknown>) => {
-    try {
-      await fn();
-    } catch (e) {
-      alert((e as Error).message);
-    }
-    fetchData();
-  };
+  const run = useAction(fetchData);
 
   const handleCreateClass = () => {
-    if (!name.trim()) return;
-    run(() => api(`/schools/${schoolId}/classes`, { method: 'POST', json: { name } }));
-    setName('');
+    if (!nome.trim()) return;
+    run(() => api(`/schools/${schoolId}/classes`, { method: 'POST', json: { name: nome } }), 'Turma criada.');
+    setNome('');
   };
 
   const handleCreateLesson = () => {
     if (!selectedClass || !selectedTeacher || !selectedSubject) return;
     run(() => api(`/schools/${schoolId}/lessons`, {
       method: 'POST',
-      json: { classId: selectedClass.id, teacherId: selectedTeacher, subjectId: selectedSubject, aulas: parseInt(aulas) },
-    }));
-    setSelectedTeacher('');
+      json: { classId: selectedClass.id, teacherId: selectedTeacher, subjectId: selectedSubject, aulas },
+    }), 'Aulas atribuídas.');
     setSelectedSubject('');
-    setAulas('1');
+    setAulas(1);
   };
 
-  const handleUpdateAulas = (lesson: Lesson, valor: string) => {
-    const n = parseInt(valor);
+  const handleUpdateAulas = (lesson: Lesson, n: number) => {
     if (!Number.isInteger(n) || n < 1 || n === lesson.aulas) return;
+    setLessons(ls => ls.map(l => (l.id === lesson.id ? { ...l, aulas: n } : l)));
     run(() => api(`/lessons/${lesson.id}`, { method: 'PUT', json: { aulas: n } }));
   };
 
   const handleDeleteLesson = (id: string) => run(() => api(`/lessons/${id}`, { method: 'DELETE' }));
 
-  const handleRenameClass = () => {
+  const handleRenameClass = async () => {
     if (!selectedClass) return;
-    const novo = prompt('Nome da turma:', selectedClass.name)?.trim();
-    if (novo && novo !== selectedClass.name) run(() => api(`/classes/${selectedClass.id}`, { method: 'PUT', json: { name: novo } }));
+    const r = await prompt({ title: 'Renomear turma', fields: [{ name: 'nome', label: 'Nome da turma', value: selectedClass.name }] });
+    if (r && r.nome !== selectedClass.name) run(() => api(`/classes/${selectedClass.id}`, { method: 'PUT', json: { name: r.nome } }), 'Turma renomeada.');
   };
 
-  const handleDeleteClass = () => {
+  const handleDeleteClass = async () => {
     if (!selectedClass) return;
-    if (!confirm(`Excluir a turma ${selectedClass.name} e todas as suas aulas atribuídas?`)) return;
+    const ok = await confirm({
+      title: `Excluir a turma ${selectedClass.name}?`,
+      message: 'Todas as aulas atribuídas a esta turma também serão removidas.',
+      confirmLabel: 'Excluir turma',
+      danger: true,
+    });
+    if (!ok) return;
     setSelectedId(null);
-    run(() => api(`/classes/${selectedClass.id}`, { method: 'DELETE' }));
+    run(() => api(`/classes/${selectedClass.id}`, { method: 'DELETE' }), 'Turma excluída.');
   };
 
   // Se o professor tem disciplinas vinculadas, mostra só elas
@@ -104,194 +102,137 @@ export default function Classes() {
 
   return (
     <>
-      <div className="max-w-6xl mx-auto fade-in">
-        <MagicImport onImportComplete={fetchData} />
+      <PageHeader title="Turmas" description="Crie as turmas e diga quantas aulas semanais cada professor dá em cada uma." />
 
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Turmas</h2>
-          <p className="text-slate-500 mt-1">Gerencie suas turmas e atribua professores às matérias de cada uma.</p>
-        </div>
-        {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">{error}</div>}
+      <MagicImport onImportComplete={() => { fetchData(); reloadSchool(); }} />
 
-        <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center mb-10 w-full max-w-2xl">
-          <input
-            type="text"
-            placeholder="Nome da nova turma (ex: 1º Ano A)..."
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="bg-transparent border-none p-4 flex-1 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-0"
-            onKeyDown={e => e.key === 'Enter' && handleCreateClass()}
-          />
-          <button
-            onClick={handleCreateClass}
-            disabled={!name.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-sm flex items-center gap-2"
-          >
-            <Layers size={20} />
-            Criar Turma
-          </button>
-        </div>
+      {error && <Alert tone="error" className="mb-6">{error}</Alert>}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-          {classes.map(c => {
-            const total = totalDa(c.id);
-            const excede = slotsSemana > 0 && total > slotsSemana;
-            return (
-              <div
-                key={c.id}
-                onClick={() => setSelectedId(c.id)}
-                className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-400 cursor-pointer transition-all flex flex-col items-center justify-center gap-3 text-center group"
-              >
-                <div className="bg-indigo-50 text-indigo-600 p-4 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <GraduationCap size={28} />
+      <QuickAdd onSubmit={handleCreateClass}>
+        <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da nova turma (ex.: 1º Ano A)..." aria-label="Nome da turma" className={quickAddInputClass} />
+        <Button type="submit" size="lg" icon={Plus} disabled={!nome.trim()}>Criar turma</Button>
+      </QuickAdd>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {classes?.map(c => {
+          const total = totalDa(c.id);
+          const excede = slotsSemana > 0 && total > slotsSemana;
+          const pct = slotsSemana ? Math.min(100, (total / slotsSemana) * 100) : 0;
+          return (
+            <TileButton key={c.id} warning={excede} onClick={() => setSelectedId(c.id)} className="items-center text-center">
+              <IconBadge icon={GraduationCap} size="lg" />
+              <h3 className="mt-3 w-full truncate text-lg font-bold text-slate-900" title={c.name}>{c.name}</h3>
+              <p className={`mt-1 text-xs font-semibold ${excede ? 'text-red-600' : 'text-slate-500'}`}>
+                {total}{slotsSemana > 0 && ` / ${slotsSemana}`} aulas
+              </p>
+              {slotsSemana > 0 && (
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                  <div className={`h-full rounded-full ${excede ? 'bg-red-500' : total === slotsSemana ? 'bg-emerald-500' : 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
                 </div>
-                <h4 className="text-lg font-bold text-slate-900 w-full truncate" title={c.name}>{c.name}</h4>
-                <span className={`text-xs font-bold px-3 py-1.5 rounded-lg w-full ${excede ? 'bg-red-50 text-red-700' : total > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-                  {total}{slotsSemana > 0 && ` / ${slotsSemana}`} aulas
-                </span>
-              </div>
-            );
-          })}
-          {classes.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
-              Nenhuma turma criada ainda.
-            </div>
-          )}
-        </div>
+              )}
+            </TileButton>
+          );
+        })}
+        {classes?.length === 0 && (
+          <EmptyState icon={Layers} title="Nenhuma turma criada" description="Crie a primeira turma acima ou use a Importação Mágica." />
+        )}
       </div>
 
-      {selectedClass && createPortal(
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in" onClick={() => setSelectedId(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl flex flex-col h-[85vh] max-h-[800px] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="bg-indigo-100 text-indigo-600 p-3 rounded-2xl"><GraduationCap size={28} /></div>
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-900">Turma: {selectedClass.name}</h3>
-                  <p className="text-sm text-slate-500">Gestão de Atribuição de Aulas</p>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={handleRenameClass} className="text-slate-400 hover:text-indigo-600 hover:bg-slate-200 p-2 rounded-xl transition-colors" title="Renomear"><Pencil size={20} /></button>
-                <button onClick={handleDeleteClass} className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-xl transition-colors" title="Excluir turma"><Trash2 size={20} /></button>
-                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-900 hover:bg-slate-200 p-2 rounded-xl transition-colors"><X size={24} /></button>
-              </div>
-            </div>
+      {selectedClass && (
+        <Modal
+          size="xl"
+          title={`Turma ${selectedClass.name}`}
+          subtitle="Atribuição de aulas"
+          icon={<IconBadge icon={GraduationCap} />}
+          headerActions={
+            <>
+              <IconButton icon={Pencil} label="Renomear" onClick={handleRenameClass} />
+              <IconButton icon={Trash2} label="Excluir turma" tone="danger" onClick={handleDeleteClass} />
+            </>
+          }
+          onClose={() => setSelectedId(null)}
+        >
+          <div className="flex flex-col md:flex-row">
+            <form
+              className="shrink-0 space-y-4 border-b border-slate-100 p-6 md:w-5/12 md:border-r md:border-b-0"
+              onSubmit={e => { e.preventDefault(); handleCreateLesson(); }}
+            >
+              <h3 className="flex items-center gap-2 font-semibold text-slate-900"><LinkIcon size={18} className="text-brand-500" /> Nova atribuição</h3>
 
-            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-              <div className="w-full md:w-5/12 bg-white border-r border-slate-100 p-6 overflow-y-auto shrink-0 flex flex-col">
-                <h4 className="font-bold text-slate-900 mb-5 flex items-center gap-2">
-                  <LinkIcon size={18} className="text-indigo-500" /> Nova Atribuição
-                </h4>
+              <Field label="Professor">
+                {id => (
+                  <Select id={id} value={selectedTeacher} onChange={e => { setSelectedTeacher(e.target.value); setSelectedSubject(''); }}>
+                    <option value="">Selecione o professor</option>
+                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </Select>
+                )}
+              </Field>
 
-                <div className="flex flex-col gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Professor</label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-3.5 text-slate-400 pointer-events-none"><User size={16} /></div>
-                      <select
-                        value={selectedTeacher}
-                        onChange={e => { setSelectedTeacher(e.target.value); setSelectedSubject(''); }}
-                        className="bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-slate-900 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
-                      >
-                        <option value="">Selecione o Professor</option>
-                        {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
+              <Field label="Disciplina">
+                {id => (
+                  <Select id={id} value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} disabled={!selectedTeacher}>
+                    <option value="">{selectedTeacher ? 'Selecione a disciplina' : 'Escolha o professor primeiro'}</option>
+                    {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.sigla})</option>)}
+                  </Select>
+                )}
+              </Field>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Disciplina</label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-3.5 text-slate-400 pointer-events-none"><BookOpen size={16} /></div>
-                      <select
-                        value={selectedSubject}
-                        onChange={e => setSelectedSubject(e.target.value)}
-                        disabled={!selectedTeacher}
-                        className="bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-slate-900 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none disabled:opacity-50"
-                      >
-                        <option value="">{selectedTeacher ? 'Selecione a Matéria' : 'Escolha o professor primeiro'}</option>
-                        {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.sigla})</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Quantidade de Aulas Semanais</label>
+              <Field label="Aulas por semana">
+                {id => (
+                  <div className="flex items-center gap-2">
+                    <IconButton icon={Minus} label="Menos uma aula" onClick={() => setAulas(a => Math.max(1, a - 1))} className="ring-1 ring-slate-200" />
                     <input
+                      id={id}
                       type="number"
+                      min={1}
                       value={aulas}
-                      onChange={e => setAulas(e.target.value)}
-                      min="1"
-                      className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-900 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      onChange={e => setAulas(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="h-11 w-20 rounded-xl border border-slate-200 text-center text-lg font-bold text-slate-900 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none"
                     />
+                    <IconButton icon={Plus} label="Mais uma aula" onClick={() => setAulas(a => a + 1)} className="ring-1 ring-slate-200" />
                   </div>
+                )}
+              </Field>
 
-                  <button
-                    onClick={handleCreateLesson}
-                    disabled={!selectedTeacher || !selectedSubject || !(parseInt(aulas) >= 1)}
-                    className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-indigo-200 flex justify-center gap-2"
-                  >
-                    Atribuir à Turma <Plus size={20} />
-                  </button>
-                </div>
+              {teachers.length === 0 && <Alert tone="info">Cadastre professores antes de atribuir aulas.</Alert>}
+
+              <Button type="submit" size="lg" icon={Plus} className="w-full" disabled={!selectedTeacher || !selectedSubject}>
+                Atribuir à turma
+              </Button>
+            </form>
+
+            <div className="flex-1 bg-slate-50/60 p-6">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 font-semibold text-slate-900"><Layers size={18} className="text-slate-400" /> Aulas atribuídas</h3>
+                <Badge tone={slotsSemana > 0 && totalDa(selectedClass.id) > slotsSemana ? 'red' : 'brand'}>
+                  Total: {totalDa(selectedClass.id)}{slotsSemana > 0 && ` de ${slotsSemana}`}
+                </Badge>
               </div>
 
-              <div className="w-full md:w-7/12 bg-slate-50 p-6 overflow-y-auto">
-                <div className="flex justify-between items-center mb-5">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                    <Layers size={18} className="text-slate-500" /> Aulas Atribuídas
-                  </h4>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${slotsSemana > 0 && totalDa(selectedClass.id) > slotsSemana ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                    Total: {totalDa(selectedClass.id)}{slotsSemana > 0 && ` de ${slotsSemana}`} aulas
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {lessonsDa(selectedClass.id).map(l => (
-                    <div key={l.id} className="group flex justify-between items-center p-4 rounded-xl border border-slate-200 hover:border-indigo-300 bg-white shadow-sm transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-center justify-center w-14 bg-slate-50 rounded-lg border border-slate-100 py-1">
-                          <input
-                            key={l.aulas}
-                            type="number"
-                            min="1"
-                            defaultValue={l.aulas}
-                            onBlur={e => handleUpdateAulas(l, e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-                            className="w-12 text-center text-lg font-bold text-slate-700 bg-transparent focus:outline-none focus:bg-white rounded"
-                            title="Clique para alterar a quantidade"
-                          />
-                          <span className="text-[10px] uppercase font-bold text-slate-400 leading-none">Aulas</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-indigo-700">{l.subject.name} <span className="text-slate-400 text-xs ml-1 font-normal">({l.subject.sigla})</span></span>
-                          <span className="text-sm font-medium text-slate-600 mt-0.5">{l.teacher.name}</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteLesson(l.id)}
-                        className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2.5 rounded-xl md:opacity-0 group-hover:opacity-100 transition-all"
-                        title="Remover atribuição"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+              <ul className="space-y-2">
+                {lessonsDa(selectedClass.id).map(l => (
+                  <li key={l.id} className="group flex items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                    <span className={`w-14 shrink-0 rounded-lg py-1.5 text-center text-xs font-bold ring-1 ${corDa(l.subject.sigla)}`}>{l.subject.sigla}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-slate-800">{l.subject.name}</div>
+                      <div className="truncate text-sm text-slate-500">{l.teacher.name}</div>
                     </div>
-                  ))}
-
-                  {lessonsDa(selectedClass.id).length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
-                      <Layers size={40} className="mb-4 text-slate-300" />
-                      <p className="font-medium text-slate-500">Nenhuma aula atribuída ainda.</p>
-                      <p className="text-sm mt-1">Use o formulário ao lado para adicionar disciplinas.</p>
+                    <div className="flex items-center rounded-lg ring-1 ring-slate-200">
+                      <button onClick={() => handleUpdateAulas(l, l.aulas - 1)} disabled={l.aulas <= 1} className="p-2 text-slate-400 hover:text-slate-900 disabled:opacity-30" aria-label="Menos uma aula"><Minus size={14} /></button>
+                      <span className="w-7 text-center font-bold text-slate-800 tabular-nums" title="Aulas por semana">{l.aulas}</span>
+                      <button onClick={() => handleUpdateAulas(l, l.aulas + 1)} className="p-2 text-slate-400 hover:text-slate-900" aria-label="Mais uma aula"><Plus size={14} /></button>
                     </div>
-                  )}
-                </div>
-              </div>
+                    <IconButton icon={Trash2} label="Remover atribuição" tone="danger" onClick={() => handleDeleteLesson(l.id)} />
+                  </li>
+                ))}
+              </ul>
+
+              {lessonsDa(selectedClass.id).length === 0 && (
+                <EmptyState icon={Layers} title="Nenhuma aula atribuída" description="Use o formulário ao lado para adicionar disciplinas a esta turma." />
+              )}
             </div>
           </div>
-        </div>,
-        document.body
+        </Modal>
       )}
     </>
   );

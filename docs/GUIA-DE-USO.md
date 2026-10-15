@@ -42,7 +42,9 @@ flowchart LR
 
 ## 2. Criando a escola
 
-Na tela inicial (**Suas Escolas**), digite o nome e clique em **Criar Escola**. Clique no cartão para abrir o painel da escola.
+Na tela inicial (**Suas escolas**), digite o nome e clique em **Criar escola**. Clique no cartão para abrir o painel da escola.
+
+O painel abre na **Visão geral**: números da escola, um checklist de **primeiros passos** (que vai ficando verde conforme você avança) e o resumo da semana letiva. O nome da escola pode ser alterado ali em **Renomear**.
 
 Cada cartão mostra quantos professores, turmas e disciplinas a escola possui. O ícone de lixeira exclui a escola **e todos os seus dados** (pede confirmação).
 
@@ -52,7 +54,7 @@ Cada cartão mostra quantos professores, turmas e disciplinas a escola possui. O
 
 Menu **Disciplinas**:
 
-- Preencha **nome** e **sigla** e clique em **Criar**. A sigla é convertida para maiúsculas automaticamente.
+- Preencha **nome** e **sigla** e clique em **Criar**. A sigla é sugerida a partir do nome (ex.: *Matemática* → `MAT`) e você pode trocá-la.
 - Clique numa disciplina para:
   - vincular/desvincular professores;
   - ✏️ editar nome e sigla;
@@ -71,28 +73,29 @@ Menu **Professores**:
 
 Cada cartão mostra:
 
-- **Matérias** vinculadas;
+- as **siglas** das disciplinas vinculadas;
 - **Restrições** cadastradas;
-- **Aulas / disponíveis** — total de aulas atribuídas versus horários livres na semana. Se ficar **vermelho**, o professor tem mais aulas do que horários livres e a grade será impossível.
+- **Aulas / horários livres** — total de aulas atribuídas versus horários livres na semana. Se ficar **vermelho**, o professor tem mais aulas do que horários livres e a grade será impossível.
 
-### Aba "Matérias Lecionadas"
+### Aba "Disciplinas"
 
 Vincule as disciplinas que o professor ensina. Isso filtra as opções na hora de atribuir aulas em uma turma.
 
 > Ao atribuir uma aula a um professor numa turma, a disciplina é vinculada a ele automaticamente.
 
-### Aba "Restrições de Horário"
+### Aba "Restrições de horário"
 
 Uma tabela **dias × horários**:
 
 - clique numa célula para alternar entre 🟩 **Livre** e 🟧 **Bloqueado**;
-- clique no **nome do dia** para bloquear/liberar o dia inteiro.
+- clique no **nome do dia** para bloquear/liberar o dia inteiro;
+- clique no **horário** (primeira coluna) para bloquear/liberar aquele horário em todos os dias.
 
 As alterações são salvas na hora.
 
-> ⚠️ Os horários da tabela são os **blocos de aula da última geração** (tela *Gerar Nova Grade*). Se ainda não gerou nenhuma grade, aparece o padrão `7h, 8h, 9h, 10h, 11h`. **Defina os blocos reais primeiro** (gere uma grade, mesmo que incompleta) e depois cadastre as restrições.
+> ⚠️ Os horários da tabela são os **blocos de aula da escola** (configurados na tela *Gerar nova grade*). Enquanto não forem configurados, aparece o padrão `7h, 8h, 9h, 10h, 11h`. **Defina os blocos reais primeiro** (em *Gerar nova grade* → **Salvar horários**) e depois cadastre as restrições.
 >
-> Se você mudar os nomes dos blocos depois, as restrições antigas aparecem numa lista separada ("horários que não existem na configuração atual") e são **ignoradas** pelo gerador. Remova-as e marque de novo na tabela.
+> Se você mudar os nomes dos blocos depois, as restrições antigas aparecem numa lista separada ("horários que não existem mais") e são **ignoradas** pelo gerador. Remova-as e marque de novo na tabela.
 
 No topo do perfil, ✏️ renomeia e 🗑️ exclui o professor (junto com as aulas dele).
 
@@ -102,28 +105,26 @@ No topo do perfil, ✏️ renomeia e 🗑️ exclui o professor (junto com as au
 
 Menu **Turmas**:
 
-1. Digite o nome da turma e clique em **Criar Turma**.
+1. Digite o nome da turma e clique em **Criar turma**.
 2. Clique na turma para abrir o painel de atribuições.
-3. Escolha **Professor**, **Disciplina** e **Quantidade de aulas semanais** e clique em **Atribuir à Turma**.
+3. Escolha **Professor**, **Disciplina** e **Aulas por semana** (botões − / +) e clique em **Atribuir à turma**.
 
 Dicas:
 
 - Atribuir de novo a mesma combinação professor + disciplina **soma** as aulas em vez de duplicar.
-- Clique no número de aulas de uma atribuição para **editá-lo** direto na lista.
-- O contador mostra `aulas atribuídas / horários da semana`. Fica vermelho se a turma tiver mais aulas do que cabe na semana.
+- Use os botões − / + de cada atribuição para **ajustar** a quantidade direto na lista.
+- O cartão da turma mostra `aulas atribuídas / horários da semana` com uma barra de progresso: fica **verde** quando a semana está completa e **vermelha** se a turma tiver mais aulas do que cabe na semana.
 - Se a turma tiver **menos** aulas que horários, as sobras aparecem como vagas (`—`) na grade.
 
 ---
 
 ## 6. Gerando a grade
 
-Menu **Gerar Nova Grade**:
+Menu **Gerar nova grade**:
 
-1. Em **Blocos de Aula**, informe os horários de cada dia separados por vírgula, por exemplo:
-   ```
-   7h - 7h45, 7h45 - 8h30, 8h50 - 9h35, 9h35 - 10h20, 10h20 - 11h05, 11h05 - 11h50
-   ```
-2. Clique em **Gerar Solução** (ou pressione Enter).
+1. Em **Horários das aulas**, monte a lista de blocos de cada dia, na ordem: digite um horário (ex.: `7h - 7h45`) e pressione **Enter** — ou cole vários separados por vírgula. Clique no **×** de um bloco para removê-lo, ou comece por um dos **modelos** (Manhã · 5 aulas, Tarde · 5 aulas…).
+2. Se só quiser guardar os horários (para cadastrar restrições antes), clique em **Salvar horários**.
+3. Clique em **Gerar grade**.
 
 O sistema então:
 
@@ -139,7 +140,7 @@ O sistema então:
    - ⚠️ **Grade gerada com conflitos** — lista o que não pôde ser resolvido (raro; veja a [seção 10](#10-dicas-para-grades-difíceis));
    - **Avisos** — preferências não atendidas (ex.: 3 aulas de MAT no mesmo dia) ou restrições com horários inexistentes.
 
-Dê um nome à grade e clique em **Salvar Grade** para guardá-la no histórico. Os blocos de aula usados ficam memorizados para a próxima vez.
+Dê um nome à grade e clique em **Salvar grade** para guardá-la no histórico. Os blocos de aula usados ficam memorizados para a próxima vez.
 
 > 🔁 Cada geração pode produzir uma grade diferente (há aleatoriedade na busca). Se não gostou, gere de novo.
 
@@ -153,18 +154,18 @@ Na tela da grade (gerada ou do histórico):
 |---|---|
 | **Por turma** | Uma tabela por turma: célula = sigla + professor. |
 | **Por professor** | Uma tabela por professor: célula = turma + sigla. Ótimo para entregar a cada docente. |
-| **Exportar CSV** | Baixa um `.csv` (separado por `;`, com acentos corretos) da visão atual. Abre direto no Excel/LibreOffice. |
+| **CSV** | Baixa um `.csv` (separado por `;`, com acentos corretos) da visão atual. Abre direto no Excel/LibreOffice. |
 | **Imprimir** | Abre a impressão do navegador com uma turma (ou professor) por página. Use "Salvar como PDF" para gerar PDF. |
 
-Cada disciplina recebe uma cor fixa para facilitar a leitura.
+Cada disciplina recebe uma cor fixa (a mesma da tela de Disciplinas) para facilitar a leitura. Com muitas turmas, use o campo **Filtrar** para achar uma tabela. **Esc** fecha a tela da grade.
 
 ---
 
 ## 8. Histórico de grades
 
-Menu **Histórico de Grades**: lista as grades salvas, da mais recente para a mais antiga.
+Menu **Histórico**: lista as grades salvas, da mais recente para a mais antiga.
 
-- 👁️ **Visualizar** — abre a grade com as mesmas opções de visão/exportação/impressão;
+- **Abrir grade** — abre a grade com as mesmas opções de visão/exportação/impressão;
 - ✏️ **Renomear**;
 - 🗑️ **Excluir**.
 
@@ -229,7 +230,7 @@ Se a grade sair com conflitos ou for considerada impossível:
 
 | Sintoma | Causa provável | Solução |
 |---|---|---|
-| *"Não foi possível conectar ao servidor"* | Backend desligado | Rode `npm run dev` na pasta `backend`. |
+| *"Não foi possível conectar ao servidor"* | Backend desligado | Rode `npm run dev` na raiz do projeto (ou na pasta `backend`). |
 | Restrições "ignoradas" nos avisos | Nome do horário diferente dos blocos atuais | Abra o professor, remova as antigas e marque na tabela. |
 | Tabela de restrições com horários errados | Ainda não gerou grade com os blocos reais | Gere uma grade com os blocos corretos primeiro. |
 | Importação: *"Formato de imagem não suportado"* | Claude não aceita HEIC/BMP etc. | Converta para JPG/PNG ou use o Gemini. |
